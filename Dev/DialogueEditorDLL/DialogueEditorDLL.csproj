@@ -176,6 +176,7 @@
     <Compile Include="Sources\Exporters\ExporterDialogues.cs" />
     <Compile Include="Sources\Exporters\ExporterLipsync.cs" />
     <Compile Include="Sources\Exporters\ExporterLocalization.cs" />
+    <Compile Include="Sources\Exporters\ExporterScriptMarkdown.cs" />
     <Compile Include="Sources\Exporters\ExporterStats.cs" />
     <Compile Include="Sources\Exporters\ExporterVoicing.cs" />
     <Compile Include="Sources\Extensions.cs" />

@@ -82,6 +82,7 @@
             this.menuItemLocalization = new System.Windows.Forms.ToolStripMenuItem();
             this.unreal4pomanifestToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuItemVoicing = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuItemScript = new System.Windows.Forms.ToolStripMenuItem();
             this.exportGameConstantsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.unreal4ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuItemAsk = new System.Windows.Forms.ToolStripMenuItem();
@@ -440,6 +441,7 @@
             this.toolStripSeparator9,
             this.menuItemLocalization,
             this.menuItemVoicing,
+            this.menuItemScript,
             exportGameLipsyncToolStripMenuItem,
             this.exportGameConstantsToolStripMenuItem});
             this.menuItemExport.Name = "menuItemExport";
@@ -554,6 +556,14 @@
             this.menuItemVoicing.Size = new System.Drawing.Size(230, 22);
             this.menuItemVoicing.Text = "Export Game &Voicing";
             this.menuItemVoicing.Click += new System.EventHandler(this.OnExportVoicing);
+            //
+            // menuItemScript
+            //
+            this.menuItemScript.Image = global::DialogueEditor.Properties.Resources.Export;
+            this.menuItemScript.Name = "menuItemScript";
+            this.menuItemScript.Size = new System.Drawing.Size(230, 22);
+            this.menuItemScript.Text = "Export Game &Script";
+            this.menuItemScript.Click += new System.EventHandler(this.OnExportScript);
             // 
             // exportGameConstantsToolStripMenuItem
             // 
@@ -652,6 +662,7 @@
         private System.Windows.Forms.ToolStripStatusLabel statusLabel;
         private System.Windows.Forms.ToolStripMenuItem menuItemExport;
         private System.Windows.Forms.ToolStripMenuItem menuItemVoicing;
+        private System.Windows.Forms.ToolStripMenuItem menuItemScript;
         private System.Windows.Forms.ToolStripMenuItem menuItemPlayDialogue;
         private System.Windows.Forms.ToolStripMenuItem menuItemExportStats;
         private System.Windows.Forms.ToolStripMenuItem menuItemOutputLog;

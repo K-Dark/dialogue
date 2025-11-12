@@ -784,6 +784,19 @@ namespace DialogueEditor
             }
         }
 
+        private void OnExportScript(object sender, EventArgs e)
+        {
+            if (ResourcesHandler.Project != null)
+            {
+                if (ExporterScriptMarkdown.ExportAll())
+                {
+                    RefreshDirtyFlags();
+
+                    EditorCore.LogInfo("Export Script Finished");
+                }
+            }
+        }
+
         private void OnExportStats(object sender, EventArgs e)
         {
             if (ResourcesHandler.Project != null)
