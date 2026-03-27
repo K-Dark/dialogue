@@ -219,6 +219,12 @@
     <Compile Include="Sources\Panels\Properties\FormPropertiesReply.Designer.cs">
       <DependentUpon>FormPropertiesReply.cs</DependentUpon>
     </Compile>
+    <Compile Include="Sources\Panels\Properties\FormPropertiesComment.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Sources\Panels\Properties\FormPropertiesComment.Designer.cs">
+      <DependentUpon>FormPropertiesComment.cs</DependentUpon>
+    </Compile>
     <Compile Include="Sources\Exporters\ExporterJson.cs" />
     <Compile Include="Sources\EditorHelper.cs" />
     <Compile Include="Sources\Panels\Properties\FormPropertiesSentence.cs">
@@ -262,6 +268,7 @@
     <Compile Include="Sources\Resources\DialogueNodeGoto.cs" />
     <Compile Include="Sources\Resources\DialogueNodeReply.cs" />
     <Compile Include="Sources\Resources\DialogueNodeRoot.cs" />
+    <Compile Include="Sources\Resources\DialogueNodeComment.cs" />
     <Compile Include="Sources\Resources\DialogueNodeSentence.cs" />
     <Compile Include="Sources\Resources\NodeFlag.cs" />
     <Compile Include="Sources\Resources\Package.cs" />
@@ -274,12 +281,16 @@
     <Compile Include="Sources\Documents\DocumentDialogue.Designer.cs">
       <DependentUpon>DocumentDialogue.cs</DependentUpon>
     </Compile>
+    <Compile Include="Sources\Documents\DocumentDialogueGraph.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Sources\Resources\TranslationTable.cs" />
     <Compile Include="Sources\Resources\VoiceActor.cs" />
     <Compile Include="Sources\Controls\TriStateTreeView.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Sources\Utility.cs" />
+    <Compile Include="Sources\ThemeManager.cs" />
     <Compile Include="Sources\Windows\WindowMain.cs">
       <SubType>Form</SubType>
     </Compile>

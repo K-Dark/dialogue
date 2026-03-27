@@ -24,11 +24,14 @@ namespace DialogueEditor
 
         private DocumentProject documentProject = null;
         private List<DocumentDialogue> documentDialogues = new List<DocumentDialogue>();
+        private List<DocumentDialogueGraph> documentDialogueGraphs = new List<DocumentDialogueGraph>();
         private Timer statusTimer;
+        private ToolStripMenuItem menuItemOpenDialogueGraph = null;
 
         private string lastClosedDialogue = "";
 
         private bool ignoreMenuItemEvents = false;
+        private bool lockSelectionSync = false;
 
         //--------------------------------------------------------------------------------------------------------------
         // Class Methods
@@ -36,12 +39,15 @@ namespace DialogueEditor
         public WindowMain()
         {
             InitializeComponent();
+            ThemeManager.ApplyTheme(this);
 
             this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         }
 
         public void Init()
         {
+            EnsureGraphMenu();
+
             //Panels
             deserializeDockContent = new DeserializeDockContent(GetContentFromPersistString);
             LoadPanels();
@@ -145,6 +151,27 @@ namespace DialogueEditor
         {
             int index = menuMain.Items.IndexOf(menuItemAsk);
             menuMain.Items.Insert(index, menuItem);
+        }
+
+        private void EnsureGraphMenu()
+        {
+            if (menuItemOpenDialogueGraph != null)
+                return;
+
+            menuItemOpenDialogueGraph = new ToolStripMenuItem();
+            menuItemOpenDialogueGraph.Image = Properties.Resources.chart_bar;
+            menuItemOpenDialogueGraph.Name = "menuItemOpenDialogueGraph";
+            menuItemOpenDialogueGraph.ShortcutKeys = (Keys.Control | Keys.Shift | Keys.G);
+            menuItemOpenDialogueGraph.Size = new Size(230, 22);
+            menuItemOpenDialogueGraph.Text = "Open Dialogue Graph";
+            menuItemOpenDialogueGraph.Click += new EventHandler(this.OnOpenDialogueGraph);
+
+            int indexInsert = menuItemExport.DropDownItems.IndexOf(menuItemCheck);
+            if (indexInsert < 0)
+                indexInsert = 0;
+
+            menuItemExport.DropDownItems.Insert(indexInsert, menuItemOpenDialogueGraph);
+            menuItemExport.DropDownItems.Insert(indexInsert + 1, new ToolStripSeparator());
         }
 
         //Obsolete, prefer the OutputLog (and the label is used to display memory)
@@ -282,12 +309,48 @@ namespace DialogueEditor
             }
 
             DocumentDialogue newDocument = new DocumentDialogue(dialogue);
+            newDocument.SelectedNodeChanged += OnDialogueNodeSelected;
+            newDocument.DialogueChanged += OnDialogueChanged;
             newDocument.Show(dockPanel, DockState.Document);
             documentDialogues.Add(newDocument);
 
             newDocument.SelectNode(node);
 
             EditorHelper.CheckDialogueErrors(dialogue);
+        }
+
+        public void OpenDocumentDialogueGraph(Dialogue dialogue)
+        {
+            if (dialogue == null)
+                return;
+
+            foreach (DocumentDialogueGraph document in documentDialogueGraphs)
+            {
+                if (document.Dialogue == dialogue)
+                {
+                    document.Activate();
+                    return;
+                }
+            }
+
+            var newDocument = new DocumentDialogueGraph(dialogue);
+            newDocument.NodeSelected += OnGraphNodeSelected;
+            newDocument.FormClosed += OnDocumentDialogueGraphFormClosed;
+            newDocument.Show(dockPanel, DockState.Document);
+            documentDialogueGraphs.Add(newDocument);
+
+            var documentDialogue = documentDialogues.FirstOrDefault(item => item.Dialogue == dialogue);
+            if (documentDialogue != null)
+            {
+                newDocument.SelectNode(documentDialogue.GetSelectedDialogueNode());
+            }
+        }
+
+        public void OpenDocumentDialogueGraph(string name)
+        {
+            var dialogue = ResourcesHandler.GetDialogue(name);
+            if (dialogue != null)
+                OpenDocumentDialogueGraph(dialogue);
         }
 
         public bool IsDocumentFocused(Dialogue dialogue)
@@ -340,6 +403,17 @@ namespace DialogueEditor
             return false;
         }
 
+        public bool CloseDocumentDialogueGraph(DocumentDialogueGraph document)
+        {
+            if (document != null)
+            {
+                document.Close();
+                return true;
+            }
+
+            return false;
+        }
+
         public void OpenDocumentProject()
         {
             if (documentProject != null)
@@ -378,6 +452,11 @@ namespace DialogueEditor
             while (documentDialogues.Count > 0)
             {
                 CloseDocumentDialogue(documentDialogues[0], true);
+            }
+
+            while (documentDialogueGraphs.Count > 0)
+            {
+                CloseDocumentDialogueGraph(documentDialogueGraphs[0]);
             }
 
             CloseDocumentProject(true);
@@ -473,6 +552,11 @@ namespace DialogueEditor
                 document.RefreshTitle();
             }
 
+            foreach (DocumentDialogueGraph document in documentDialogueGraphs)
+            {
+                document.RefreshTitle();
+            }
+
             if (documentProject != null)
                 documentProject.RefreshTitle();
         }
@@ -525,6 +609,9 @@ namespace DialogueEditor
         {
             if (force || !ResourcesHandler.IsDirty(document.Dialogue) || ShowPopupCloseDocuments(null, new List<Dialogue>() { document.Dialogue }))
             {
+                document.SelectedNodeChanged -= OnDialogueNodeSelected;
+                document.DialogueChanged -= OnDialogueChanged;
+
                 if (document == dockPanel.ActiveContent)
                 {
                     EditorCore.Properties?.Clear();
@@ -536,6 +623,83 @@ namespace DialogueEditor
                 return true;
             }
             return false;
+        }
+
+        private void OnDocumentDialogueGraphFormClosed(object sender, FormClosedEventArgs e)
+        {
+            var document = sender as DocumentDialogueGraph;
+            if (document != null)
+            {
+                document.NodeSelected -= OnGraphNodeSelected;
+                document.FormClosed -= OnDocumentDialogueGraphFormClosed;
+                documentDialogueGraphs.Remove(document);
+            }
+        }
+
+        private void OnDialogueNodeSelected(DocumentDialogue document, DialogueNode node)
+        {
+            if (document == null || lockSelectionSync)
+                return;
+
+            lockSelectionSync = true;
+            try
+            {
+                foreach (var graph in documentDialogueGraphs.Where(item => item.Dialogue == document.Dialogue))
+                {
+                    graph.RefreshDocument();
+                    graph.SelectNode(node);
+                }
+            }
+            finally
+            {
+                lockSelectionSync = false;
+            }
+        }
+
+        private void OnDialogueChanged(DocumentDialogue document)
+        {
+            if (document == null)
+                return;
+
+            foreach (var graph in documentDialogueGraphs.Where(item => item.Dialogue == document.Dialogue))
+            {
+                graph.RefreshDocument();
+                graph.SelectNode(document.GetSelectedDialogueNode());
+                graph.RefreshTitle();
+            }
+        }
+
+        private void OnGraphNodeSelected(DocumentDialogueGraph graphDocument, DialogueNode node)
+        {
+            if (graphDocument == null || lockSelectionSync)
+                return;
+
+            lockSelectionSync = true;
+            try
+            {
+                var dialogueDocument = documentDialogues.FirstOrDefault(item => item.Dialogue == graphDocument.Dialogue);
+                if (dialogueDocument == null)
+                {
+                    OpenDocumentDialogue(graphDocument.Dialogue, (node != null) ? node.ID : DialogueNode.ID_NULL);
+                    dialogueDocument = documentDialogues.FirstOrDefault(item => item.Dialogue == graphDocument.Dialogue);
+                }
+
+                if (dialogueDocument != null)
+                {
+                    if (node != null)
+                    {
+                        dialogueDocument.SelectNode(node);
+                    }
+                    else
+                    {
+                        dialogueDocument.SelectRootNode();
+                    }
+                }
+            }
+            finally
+            {
+                lockSelectionSync = false;
+            }
         }
 
         public bool OnDocumentProjectClosed(bool force)
@@ -858,6 +1022,28 @@ namespace DialogueEditor
                 var document = dockPanel.ActiveDocument as DocumentDialogue;
                 var viewer = new WindowViewer(document.Dialogue, document.GetSelectedDialogueNode(), document);
                 viewer.ShowDialog(this);
+            }
+        }
+
+        private void OnOpenDialogueGraph(object sender, EventArgs e)
+        {
+            if (dockPanel.ActiveDocument is DocumentDialogue)
+            {
+                var document = dockPanel.ActiveDocument as DocumentDialogue;
+                OpenDocumentDialogueGraph(document.Dialogue);
+
+                var graph = documentDialogueGraphs.FirstOrDefault(item => item.Dialogue == document.Dialogue);
+                graph?.SelectNode(document.GetSelectedDialogueNode());
+            }
+            else
+            {
+                var document = GetActiveDocument();
+                if (document != null)
+                {
+                    OpenDocumentDialogueGraph(document.Dialogue);
+                    var graph = documentDialogueGraphs.FirstOrDefault(item => item.Dialogue == document.Dialogue);
+                    graph?.SelectNode(document.GetSelectedDialogueNode());
+                }
             }
         }
 

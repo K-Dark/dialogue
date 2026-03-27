@@ -33,6 +33,7 @@
             System.Windows.Forms.ToolStripMenuItem addChoiceToolStripMenuItem;
             System.Windows.Forms.ToolStripMenuItem addGotoToolStripMenuItem;
             System.Windows.Forms.ToolStripMenuItem addBranchToolStripMenuItem;
+            System.Windows.Forms.ToolStripMenuItem addCommentToolStripMenuItem;
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(DocumentDialogue));
             this.tree = new System.Windows.Forms.TreeView();
             this.contextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
@@ -47,6 +48,7 @@
             this.menuItemAddChoice = new System.Windows.Forms.ToolStripMenuItem();
             this.menuItemAddGoto = new System.Windows.Forms.ToolStripMenuItem();
             this.menuItemAddBranch = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuItemAddComment = new System.Windows.Forms.ToolStripMenuItem();
             this.separatorReference = new System.Windows.Forms.ToolStripSeparator();
             this.menuItemCopyReference = new System.Windows.Forms.ToolStripMenuItem();
             this.menuItemPasteReference = new System.Windows.Forms.ToolStripMenuItem();
@@ -64,6 +66,8 @@
             this.checkBoxDisplayFlags = new System.Windows.Forms.CheckBox();
             this.checkBoxDisplayText = new System.Windows.Forms.CheckBox();
             this.checkBoxUseActorColors = new System.Windows.Forms.CheckBox();
+            this.checkBoxDisplayContext = new System.Windows.Forms.CheckBox();
+            this.checkBoxDisplayComments = new System.Windows.Forms.CheckBox();
             this.comboBoxLanguages = new System.Windows.Forms.ComboBox();
             this.label1 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
@@ -75,6 +79,7 @@
             addChoiceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             addGotoToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             addBranchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            addCommentToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.contextMenu.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -105,6 +110,13 @@
             addBranchToolStripMenuItem.Size = new System.Drawing.Size(147, 22);
             addBranchToolStripMenuItem.Text = "Add Branch";
             addBranchToolStripMenuItem.Click += new System.EventHandler(this.OnBranchNodeBranch);
+            // 
+            // addCommentToolStripMenuItem
+            // 
+            addCommentToolStripMenuItem.Name = "addCommentToolStripMenuItem";
+            addCommentToolStripMenuItem.Size = new System.Drawing.Size(147, 22);
+            addCommentToolStripMenuItem.Text = "Add Comment";
+            addCommentToolStripMenuItem.Click += new System.EventHandler(this.OnBranchNodeComment);
             // 
             // tree
             // 
@@ -142,6 +154,7 @@
             this.menuItemAddChoice,
             this.menuItemAddGoto,
             this.menuItemAddBranch,
+            this.menuItemAddComment,
             this.menuItemAddReturn,
             this.separatorReference,
             this.menuItemCopyReference,
@@ -153,7 +166,7 @@
             this.separatorDelete,
             this.menuItemDelete});
             this.contextMenu.Name = "m_pContextMenu";
-            this.contextMenu.Size = new System.Drawing.Size(158, 348);
+            this.contextMenu.Size = new System.Drawing.Size(158, 370);
             this.contextMenu.Opened += new System.EventHandler(this.OnContextMenuOpened);
             // 
             // menuItemOpenDirectory
@@ -193,7 +206,8 @@
             addSentenceToolStripMenuItem,
             addChoiceToolStripMenuItem,
             addGotoToolStripMenuItem,
-            addBranchToolStripMenuItem});
+            addBranchToolStripMenuItem,
+            addCommentToolStripMenuItem});
             this.menuItemBranch.Name = "menuItemBranch";
             this.menuItemBranch.Size = new System.Drawing.Size(157, 22);
             this.menuItemBranch.Text = "Branch";
@@ -230,6 +244,13 @@
             this.menuItemAddBranch.Size = new System.Drawing.Size(157, 22);
             this.menuItemAddBranch.Text = "Add Branch";
             this.menuItemAddBranch.Click += new System.EventHandler(this.OnAddNodeBranch);
+            // 
+            // menuItemAddComment
+            // 
+            this.menuItemAddComment.Name = "menuItemAddComment";
+            this.menuItemAddComment.Size = new System.Drawing.Size(157, 22);
+            this.menuItemAddComment.Text = "Add Comment";
+            this.menuItemAddComment.Click += new System.EventHandler(this.OnAddNodeComment);
             // 
             // separatorReference
             // 
@@ -376,6 +397,28 @@
             this.checkBoxUseActorColors.UseVisualStyleBackColor = true;
             this.checkBoxUseActorColors.CheckedChanged += new System.EventHandler(this.OnCheckDisplayOptions);
             // 
+            // checkBoxDisplayContext
+            // 
+            this.checkBoxDisplayContext.AutoSize = true;
+            this.checkBoxDisplayContext.Location = new System.Drawing.Point(386, 5);
+            this.checkBoxDisplayContext.Name = "checkBoxDisplayContext";
+            this.checkBoxDisplayContext.Size = new System.Drawing.Size(62, 17);
+            this.checkBoxDisplayContext.TabIndex = 18;
+            this.checkBoxDisplayContext.Text = "Context";
+            this.checkBoxDisplayContext.UseVisualStyleBackColor = true;
+            this.checkBoxDisplayContext.CheckedChanged += new System.EventHandler(this.OnCheckDisplayOptions);
+            // 
+            // checkBoxDisplayComments
+            // 
+            this.checkBoxDisplayComments.AutoSize = true;
+            this.checkBoxDisplayComments.Location = new System.Drawing.Point(386, 23);
+            this.checkBoxDisplayComments.Name = "checkBoxDisplayComments";
+            this.checkBoxDisplayComments.Size = new System.Drawing.Size(75, 17);
+            this.checkBoxDisplayComments.TabIndex = 19;
+            this.checkBoxDisplayComments.Text = "Comments";
+            this.checkBoxDisplayComments.UseVisualStyleBackColor = true;
+            this.checkBoxDisplayComments.CheckedChanged += new System.EventHandler(this.OnCheckDisplayOptions);
+            // 
             // comboBoxLanguages
             // 
             this.comboBoxLanguages.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
@@ -404,7 +447,7 @@
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(524, 11);
+            this.button1.Location = new System.Drawing.Point(548, 11);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(75, 23);
             this.button1.TabIndex = 23;
@@ -414,9 +457,9 @@
             // 
             // labelFont
             // 
-            this.labelFont.Location = new System.Drawing.Point(395, 5);
+            this.labelFont.Location = new System.Drawing.Point(467, 5);
             this.labelFont.Name = "labelFont";
-            this.labelFont.Size = new System.Drawing.Size(123, 35);
+            this.labelFont.Size = new System.Drawing.Size(75, 35);
             this.labelFont.TabIndex = 24;
             this.labelFont.Text = "labelFont";
             this.labelFont.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
@@ -443,6 +486,8 @@
             // 
             this.ClientSize = new System.Drawing.Size(775, 462);
             this.Controls.Add(this.checkBoxUseConstants);
+            this.Controls.Add(this.checkBoxDisplayComments);
+            this.Controls.Add(this.checkBoxDisplayContext);
             this.Controls.Add(this.labelFont);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.label2);
@@ -494,6 +539,8 @@
         private System.Windows.Forms.CheckBox checkBoxDisplayFlags;
         private System.Windows.Forms.CheckBox checkBoxDisplayText;
         private System.Windows.Forms.CheckBox checkBoxUseActorColors;
+        private System.Windows.Forms.CheckBox checkBoxDisplayContext;
+        private System.Windows.Forms.CheckBox checkBoxDisplayComments;
         private System.Windows.Forms.ToolStripMenuItem menuItemCopyID;
         private System.Windows.Forms.ToolStripSeparator separatorReply;
         private System.Windows.Forms.ToolStripMenuItem menuItemOpenDirectory;
@@ -506,6 +553,7 @@
         private System.Windows.Forms.Label labelFont;
         private System.Windows.Forms.CheckBox checkBoxUseConstants;
         private System.Windows.Forms.ToolStripMenuItem menuItemAddBranch;
+        private System.Windows.Forms.ToolStripMenuItem menuItemAddComment;
         private System.Windows.Forms.ToolStripMenuItem menuItemBranch;
         private System.Windows.Forms.ToolStripSeparator separatorBranch;
         private System.Windows.Forms.ToolStripMenuItem menuItemAddReturn;

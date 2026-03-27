@@ -14,7 +14,7 @@ namespace DialogueEditor
 
         // If true, prints Context/Comment/Intensity notes BEFORE the spoken block.
         // If false, prints them AFTER the spoken block.
-        private const bool NOTES_BEFORE_LINE_BLOCK = true;
+        private static readonly bool NOTES_BEFORE_LINE_BLOCK = true;
 
         // --------------------------------------------------------------------
         // Entry
@@ -173,6 +173,11 @@ namespace DialogueEditor
                         ref lastSpeaker
                     );
                     node = s.Next;
+                }
+                else if (node is DialogueNodeComment comment)
+                {
+                    WriteCommentBlock(file, comment.Comment);
+                    node = comment.Next;
                 }
                 else if (node is DialogueNodeChoice choice)
                 {
@@ -336,6 +341,19 @@ namespace DialogueEditor
             lastSpeaker = speaker;
         }
 
+        private static void WriteCommentBlock(StreamWriter file, string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                file.WriteLine("*Comment*");
+                file.WriteLine();
+                return;
+            }
+
+            WriteItalicLines(file, text);
+            file.WriteLine();
+        }
+
         // --------------------------------------------------------------------
         // Notes helpers (Context / Comment / Intensity)
 
@@ -394,14 +412,20 @@ namespace DialogueEditor
                 if (sentence.Length > 70) sentence = sentence.Substring(0, 70) + "…";
                 return $"{spk}: {sentence}";
             }
-            if (node is DialogueNodeChoice c)
-                return $"Choice: {c.Choice}";
+            if (node is DialogueNodeChoice choiceNode)
+                return $"Choice: {choiceNode.Choice}";
             if (node is DialogueNodeReturn)
                 return "Return";
             if (node is DialogueNodeReply r)
                 return $"Reply: {r.Reply}";
             if (node is DialogueNodeBranch b)
                 return string.IsNullOrWhiteSpace(b.Workstring) ? "Branch" : $"Branch: {b.Workstring}";
+            if (node is DialogueNodeComment commentNode)
+            {
+                string text = commentNode.Comment.Replace("\n", " ").Trim();
+                if (text.Length > 70) text = text.Substring(0, 70) + "...";
+                return string.IsNullOrWhiteSpace(text) ? "Comment" : $"Comment: {text}";
+            }
 
             return node.GetType().Name;
         }

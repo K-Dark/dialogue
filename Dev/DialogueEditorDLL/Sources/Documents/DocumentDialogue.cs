@@ -16,13 +16,34 @@ namespace DialogueEditor
         //--------------------------------------------------------------------------------------------------------------
         // Helper Class
 
+        protected enum EDisplayRowKind
+        {
+            None,
+            Context,
+            Comment,
+        }
+
         protected class NodeWrap
         {
             public DialogueNode DialogueNode;
+            public bool IsDisplayRow;
+            public EDisplayRowKind DisplayRowKind;
+            public TreeNode OwnerTreeNode;
 
             public NodeWrap(DialogueNode dialogueNode)
             {
                 DialogueNode = dialogueNode;
+                IsDisplayRow = false;
+                DisplayRowKind = EDisplayRowKind.None;
+                OwnerTreeNode = null;
+            }
+
+            public NodeWrap(DialogueNode dialogueNode, EDisplayRowKind displayRowKind, TreeNode ownerTreeNode)
+            {
+                DialogueNode = dialogueNode;
+                IsDisplayRow = true;
+                DisplayRowKind = displayRowKind;
+                OwnerTreeNode = ownerTreeNode;
             }
         }
 
@@ -36,6 +57,8 @@ namespace DialogueEditor
         // Public vars
 
         public Dialogue Dialogue;
+        public event Action<DocumentDialogue, DialogueNode> SelectedNodeChanged;
+        public event Action<DocumentDialogue> DialogueChanged;
 
         public bool ForceClose = false;
 
@@ -48,6 +71,7 @@ namespace DialogueEditor
         protected bool pendingDirty = false;
         protected List<State> previousStates = new List<State>();
         protected int indexState = 0;
+        protected int displayNodeKeyCounter = 0;
 
         //--------------------------------------------------------------------------------------------------------------
         // Class Methods
@@ -55,6 +79,7 @@ namespace DialogueEditor
         public DocumentDialogue(Dialogue inDialogue)
         {
             InitializeComponent();
+            ThemeManager.ApplyTheme(this);
 
             EditorHelper.AbsorbMouseWheelEvent(comboBoxLanguages);
 
@@ -67,6 +92,8 @@ namespace DialogueEditor
             //Note: Allowing default rendering will allow drag&drop with left mouse button.
             tree.DrawMode = TreeViewDrawMode.OwnerDrawText;
             tree.DrawNode += OnTreeViewDrawNode;
+            tree.FullRowSelect = true;
+            tree.MouseDown += OnTreeMouseDown;
 
             //Ensure custom properties were generated for this dialogue
             Dialogue.GenerateCustomProperties();
@@ -87,6 +114,7 @@ namespace DialogueEditor
             RefreshTitle();
 
             SaveState();
+            DialogueChanged?.Invoke(this);
         }
 
         public void SetPendingDirty()
@@ -131,6 +159,7 @@ namespace DialogueEditor
             ResyncDocument();
             SelectRootNode();
             RefreshTitle();
+            DialogueChanged?.Invoke(this);
         }
 
         public void RefreshDocument()
@@ -276,13 +305,32 @@ namespace DialogueEditor
             SetDirty();
         }
 
+        public void CreateNodeComment(TreeNode treeNodeFrom, bool branch)
+        {
+            if (branch && (!(GetDialogueNode(treeNodeFrom) is DialogueNodeBranch)))
+                return;
+
+            DialogueNodeComment nodeComment = new DialogueNodeComment();
+            Dialogue.AddNode(nodeComment);
+
+            TreeNode newTreeNode = AddNodeComment(treeNodeFrom, nodeComment, branch);
+            SelectTreeNode(newTreeNode);
+
+            if (EditorCore.Properties != null)
+                EditorCore.Properties.ForceFocus();
+
+            SetDirty();
+        }
+
         public virtual TreeNode AddNodeSentence(TreeNode treeNodeFrom, DialogueNodeSentence sentence, bool branch)
         {
+            treeNodeFrom = GetRealTreeNode(treeNodeFrom);
             if (treeNodeFrom == null || sentence == null)
                 return null;
 
             WIN32.StopRedraw(this);
             tree.BeginUpdate();
+            StripDisplayRows(tree.Nodes);
 
             TreeNode newTreeNode = null;
             if (branch || IsTreeNodeRoot(treeNodeFrom) || IsTreeNodeReply(treeNodeFrom))
@@ -296,6 +344,7 @@ namespace DialogueEditor
             }
 
             ResolvePostNodeInsertion(treeNodeFrom, sentence, branch);
+            RefreshDisplayRows();
 
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
@@ -306,11 +355,13 @@ namespace DialogueEditor
 
         public virtual TreeNode AddNodeChoice(TreeNode treeNodeFrom, DialogueNodeChoice choice, bool branch)
         {
+            treeNodeFrom = GetRealTreeNode(treeNodeFrom);
             if (treeNodeFrom == null || choice == null)
                 return null;
 
             WIN32.StopRedraw(this);
             tree.BeginUpdate();
+            StripDisplayRows(tree.Nodes);
 
             TreeNode newTreeNode = null;
             if (branch || IsTreeNodeRoot(treeNodeFrom) || IsTreeNodeReply(treeNodeFrom))
@@ -324,6 +375,7 @@ namespace DialogueEditor
             }
 
             ResolvePostNodeInsertion(treeNodeFrom, choice, branch);
+            RefreshDisplayRows();
 
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
@@ -334,11 +386,13 @@ namespace DialogueEditor
 
         public virtual TreeNode AddNodeReply(TreeNode treeNodeFrom, DialogueNodeReply reply)
         {
+            treeNodeFrom = GetRealTreeNode(treeNodeFrom);
             if (!IsTreeNodeChoice(treeNodeFrom) || reply == null)
                 return null;
 
             WIN32.StopRedraw(this);
             tree.BeginUpdate();
+            StripDisplayRows(tree.Nodes);
 
             TreeNode newTreeNode = null;
             newTreeNode = AddTreeNode(reply, treeNodeFrom, treeNodeFrom.LastNode);
@@ -346,6 +400,7 @@ namespace DialogueEditor
 
             var nodeDialogueFrom = GetDialogueNode(treeNodeFrom) as DialogueNodeChoice;
             nodeDialogueFrom.Replies.Add(reply);
+            RefreshDisplayRows();
 
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
@@ -356,11 +411,13 @@ namespace DialogueEditor
 
         public virtual TreeNode AddNodeGoto(TreeNode treeNodeFrom, DialogueNodeGoto nodeGoto, bool branch)
         {
+            treeNodeFrom = GetRealTreeNode(treeNodeFrom);
             if (treeNodeFrom == null || nodeGoto == null)
                 return null;
 
             WIN32.StopRedraw(this);
             tree.BeginUpdate();
+            StripDisplayRows(tree.Nodes);
 
             TreeNode newTreeNode = null;
             if (branch || IsTreeNodeRoot(treeNodeFrom) || IsTreeNodeReply(treeNodeFrom))
@@ -374,6 +431,7 @@ namespace DialogueEditor
             }
 
             ResolvePostNodeInsertion(treeNodeFrom, nodeGoto, branch);
+            RefreshDisplayRows();
 
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
@@ -384,11 +442,13 @@ namespace DialogueEditor
 
         public virtual TreeNode AddNodeBranch(TreeNode treeNodeFrom, DialogueNodeBranch nodeBranch, bool branch)
         {
+            treeNodeFrom = GetRealTreeNode(treeNodeFrom);
             if (treeNodeFrom == null || nodeBranch == null)
                 return null;
 
             WIN32.StopRedraw(this);
             tree.BeginUpdate();
+            StripDisplayRows(tree.Nodes);
 
             TreeNode newTreeNode = null;
             if (branch || IsTreeNodeRoot(treeNodeFrom) || IsTreeNodeReply(treeNodeFrom))
@@ -402,6 +462,7 @@ namespace DialogueEditor
             }
 
             ResolvePostNodeInsertion(treeNodeFrom, nodeBranch, branch);
+            RefreshDisplayRows();
 
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
@@ -412,11 +473,13 @@ namespace DialogueEditor
 
         public virtual TreeNode AddNodeReturn(TreeNode treeNodeFrom, DialogueNodeReturn nodeReturn, bool branch)
         {
+            treeNodeFrom = GetRealTreeNode(treeNodeFrom);
             if (treeNodeFrom == null || nodeReturn == null)
                 return null;
 
             WIN32.StopRedraw(this);
             tree.BeginUpdate();
+            StripDisplayRows(tree.Nodes);
 
             TreeNode newTreeNode = null;
             if (branch || IsTreeNodeRoot(treeNodeFrom) || IsTreeNodeReply(treeNodeFrom))
@@ -430,6 +493,38 @@ namespace DialogueEditor
             }
 
             ResolvePostNodeInsertion(treeNodeFrom, nodeReturn, branch);
+            RefreshDisplayRows();
+
+            tree.EndUpdate();
+            WIN32.ResumeRedraw(this);
+            this.Refresh();
+
+            return newTreeNode;
+        }
+
+        public virtual TreeNode AddNodeComment(TreeNode treeNodeFrom, DialogueNodeComment nodeComment, bool branch)
+        {
+            treeNodeFrom = GetRealTreeNode(treeNodeFrom);
+            if (treeNodeFrom == null || nodeComment == null)
+                return null;
+
+            WIN32.StopRedraw(this);
+            tree.BeginUpdate();
+            StripDisplayRows(tree.Nodes);
+
+            TreeNode newTreeNode = null;
+            if (branch || IsTreeNodeRoot(treeNodeFrom) || IsTreeNodeReply(treeNodeFrom))
+            {
+                newTreeNode = AddTreeNodeChild(nodeComment, treeNodeFrom);
+                treeNodeFrom.Expand();
+            }
+            else
+            {
+                newTreeNode = AddTreeNodeSibling(nodeComment, treeNodeFrom);
+            }
+
+            ResolvePostNodeInsertion(treeNodeFrom, nodeComment, branch);
+            RefreshDisplayRows();
 
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
@@ -570,6 +665,15 @@ namespace DialogueEditor
 
                 AddTreeNodeSibling(node.Next, newTreeNode);
             }
+            else if (node is DialogueNodeComment)
+            {
+                newTreeNode = parentTreeNode.Nodes.Insert(insertIndex, GetNodeKey(node.ID), "");
+                newTreeNode.Tag = new NodeWrap(node);
+                newTreeNode.ContextMenuStrip = contextMenu;
+                EditorHelper.SetNodeIcon(newTreeNode, ENodeIcon.Comment);
+
+                AddTreeNodeSibling(node.Next, newTreeNode);
+            }
 
             if (newTreeNode != null)
             {
@@ -581,12 +685,14 @@ namespace DialogueEditor
 
         public void RemoveNode(TreeNode treeNode)
         {
-            DialogueNode dialogueNode = ((NodeWrap)tree.SelectedNode.Tag).DialogueNode;
-            RemoveNode(dialogueNode, tree.SelectedNode);
+            TreeNode selectedNode = GetRealTreeNode(treeNode);
+            DialogueNode dialogueNode = GetDialogueNode(selectedNode);
+            RemoveNode(dialogueNode, selectedNode);
         }
 
         public virtual void RemoveNode(DialogueNode node, TreeNode treeNode)
         {
+            treeNode = GetRealTreeNode(treeNode);
             if (node == null || treeNode == null)
                 return;
 
@@ -596,8 +702,9 @@ namespace DialogueEditor
             if (copyReference == node.ID)
                 copyReference = -1;
 
+            StripDisplayRows(tree.Nodes);
             Dialogue.RemoveNode(node);
-            treeNode.Nodes.Remove(treeNode);
+            treeNode.Remove();
 
             RefreshAllTreeNodes();
 
@@ -608,6 +715,7 @@ namespace DialogueEditor
         {
             copyReference = -1;
 
+            StripDisplayRows(tree.Nodes);
             Dialogue.ListNodes.RemoveAll(item => item != Dialogue.RootNode);
             Dialogue.RootNode.Next = null;
 
@@ -627,6 +735,9 @@ namespace DialogueEditor
 
         private bool MoveTreeNode(TreeNode nodeMove, TreeNode nodeTarget, EMoveTreeNode moveType)
         {
+            nodeMove = GetRealTreeNode(nodeMove);
+            nodeTarget = GetRealTreeNode(nodeTarget);
+
             if (nodeMove == null || nodeTarget == null || nodeMove == nodeTarget)
                 return false;
 
@@ -641,6 +752,8 @@ namespace DialogueEditor
             Dialogue.GetDependingNodes(GetDialogueNode(nodeMove), ref dependendingNodes);
             if (dependendingNodes.Contains(GetDialogueNode(nodeTarget)))
                 return false;
+
+            StripDisplayRows(tree.Nodes);
 
             if (IsTreeNodeReply(nodeMove))
             {
@@ -677,6 +790,7 @@ namespace DialogueEditor
                 }
                 else
                 {
+                    RefreshDisplayRows();
                     return false;   //this should not happen, the case is checked above
                 }
             }
@@ -751,6 +865,7 @@ namespace DialogueEditor
             }
 
             SelectTreeNode(nodeMove);
+            RefreshDisplayRows();
 
             return true;
         }
@@ -772,6 +887,7 @@ namespace DialogueEditor
 
         public virtual void SelectTreeNode(TreeNode treeNode)
         {
+            treeNode = GetRealTreeNode(treeNode);
             if (treeNode == null)
                 return;
 
@@ -780,14 +896,15 @@ namespace DialogueEditor
 
         public void ResyncSelectedNode()
         {
-            if (tree.SelectedNode == null)
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+            if (selectedNode == null)
                 return;
             
             //tree.BeginUpdate();   //Doesnt seem necessary since we will not edit much most of the time, and keeping it adds a permanent flickering
 
             UnHighlightAll();
 
-            DialogueNodeGoto nodeGoto = ((NodeWrap)tree.SelectedNode.Tag).DialogueNode as DialogueNodeGoto;
+            DialogueNodeGoto nodeGoto = ((NodeWrap)selectedNode.Tag).DialogueNode as DialogueNodeGoto;
             if (nodeGoto != null)
             {
                 Highlight(nodeGoto.Goto);
@@ -804,25 +921,35 @@ namespace DialogueEditor
                 }
             }
 
-            EditorCore.Properties?.ShowDialogueNodeProperties(this, tree.SelectedNode, ((NodeWrap)tree.SelectedNode.Tag).DialogueNode);
-            EditorCore.CustomProperties?.ShowDialogueNodeProperties(this, tree.SelectedNode, ((NodeWrap)tree.SelectedNode.Tag).DialogueNode);
+            EditorCore.Properties?.ShowDialogueNodeProperties(this, selectedNode, ((NodeWrap)selectedNode.Tag).DialogueNode);
+            EditorCore.CustomProperties?.ShowDialogueNodeProperties(this, selectedNode, ((NodeWrap)selectedNode.Tag).DialogueNode);
 
             //tree.EndUpdate();
         }
 
         public void RefreshAllTreeNodes()
         {
-            if (tree.Nodes.Count > 0)
-                RefreshAllTreeNodes(tree.Nodes[0]);
+            TreeNode rootNode = GetRootNode();
+            if (rootNode != null)
+                RefreshAllTreeNodes(rootNode);
         }
 
         public void RefreshAllTreeNodes(TreeNode parent)
         {
+            TreeNode rootParent = GetRealTreeNode(parent);
+            if (rootParent == null)
+                return;
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+
             WIN32.StopRedraw(this);
             tree.BeginUpdate();
 
-            RefreshTreeNode_Impl(parent);
-            RefreshAllTreeNodes_Impl(parent);
+            StripDisplayRows(tree.Nodes);
+
+            RefreshTreeNode_Impl(rootParent);
+            RefreshAllTreeNodes_Impl(rootParent);
+
+            RefreshDisplayRows(selectedNode);
 
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
@@ -831,10 +958,18 @@ namespace DialogueEditor
 
         public void RefreshTreeNode(TreeNode treeNode)
         {
+            TreeNode realNode = GetRealTreeNode(treeNode);
+            if (realNode == null)
+                return;
+
             WIN32.StopRedraw(this);
             tree.BeginUpdate();
 
-            RefreshTreeNode_Impl(treeNode);
+            StripDisplayRows(tree.Nodes);
+
+            RefreshTreeNode_Impl(realNode);
+
+            RefreshDisplayRows(realNode);
 
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
@@ -866,6 +1001,9 @@ namespace DialogueEditor
         {
             foreach (TreeNode node in parent.Nodes)
             {
+                if (IsDisplayTreeNode(node))
+                    continue;
+
                 RefreshTreeNode_Impl(node, true);
                 RefreshAllTreeNodes_Impl(node);
             }
@@ -893,7 +1031,8 @@ namespace DialogueEditor
             || dialogueNode is DialogueNodeChoice
             || dialogueNode is DialogueNodeGoto
             || dialogueNode is DialogueNodeBranch
-            || dialogueNode is DialogueNodeReturn)
+            || dialogueNode is DialogueNodeReturn
+            || dialogueNode is DialogueNodeComment)
             {
                 style |= FontStyle.Italic;
             }
@@ -914,7 +1053,7 @@ namespace DialogueEditor
                 string textID = GetTreeNodeTextID(dialogueNode);
                 string textAttributes = GetTreeNodeTextAttributes(dialogueNode);
                 string textActors = GetTreeNodeTextActors(dialogueNode);
-                string textContent = GetTreeNodeTextContent(dialogueNode);
+                string textContent = GetTreeNodeTextContent(dialogueNode, treeNode.Level);
 
                 treeNode.Text = textID + textAttributes + textActors + textContent;
             }
@@ -955,6 +1094,10 @@ namespace DialogueEditor
             else if (dialogueNode is DialogueNodeReturn)
             {
                 return Color.FromArgb(220, 100, 0);   //Orange
+            }
+            else if (dialogueNode is DialogueNodeComment)
+            {
+                return Color.FromArgb(125, 125, 125); //Grey
             }
 
             return Color.FromArgb(0, 0, 220);   //Blue
@@ -1016,7 +1159,7 @@ namespace DialogueEditor
             return "";
         }
 
-        private string GetTreeNodeTextContent(DialogueNode dialogueNode)
+        private string GetTreeNodeTextContent(DialogueNode dialogueNode, int nodeLevel = 0)
         {
             if (dialogueNode is DialogueNodeRoot)
                 return "Root";
@@ -1093,8 +1236,219 @@ namespace DialogueEditor
             {
                 return String.Format("Return");
             }
+            else if (dialogueNode is DialogueNodeComment)
+            {
+                if (EditorCore.Settings.DisplayComments)
+                {
+                    DialogueNodeComment nodeComment = dialogueNode as DialogueNodeComment;
+                    List<string> lines = GetWrappedDisplayNoteLines(nodeComment.Comment, nodeLevel);
+                    if (lines.Count > 0)
+                        return lines[0];
+                }
+                return "Comment";
+            }
 
             return "";
+        }
+
+        private string FormatDisplayNote(string note, int maxLength = 200)
+        {
+            if (String.IsNullOrWhiteSpace(note))
+                return "";
+
+            string formatted = note.Replace("\r\n", " | ").Replace("\n", " | ").Trim();
+            if (formatted.Length > maxLength)
+                formatted = formatted.Substring(0, maxLength) + "...";
+            return formatted;
+        }
+
+        private Color GetDisplayRowColor(EDisplayRowKind rowKind)
+        {
+            if (rowKind == EDisplayRowKind.Context)
+                return Color.SlateBlue;
+            if (rowKind == EDisplayRowKind.Comment)
+                return Color.Gray;
+            return Color.Gray;
+        }
+
+        private int EstimateDisplayWrapLength(int nodeLevel)
+        {
+            int availableWidth = Math.Max(120, tree.ClientSize.Width - 80 - (nodeLevel * tree.Indent));
+            int avgCharWidth = Math.Max(6, TextRenderer.MeasureText("W", tree.Font).Width - 2);
+            return Math.Max(20, availableWidth / avgCharWidth);
+        }
+
+        private List<string> GetWrappedDisplayNoteLines(string note, int nodeLevel)
+        {
+            return WrapDisplayNote(note, EstimateDisplayWrapLength(nodeLevel));
+        }
+
+        private List<string> WrapDisplayNote(string note, int maxCharsPerLine)
+        {
+            List<string> wrappedLines = new List<string>();
+
+            if (String.IsNullOrWhiteSpace(note))
+                return wrappedLines;
+
+            string[] blocks = note.Replace("\r\n", "\n").Split('\n');
+            foreach (string block in blocks)
+            {
+                string text = block.Trim();
+                if (String.IsNullOrEmpty(text))
+                    continue;
+
+                StringBuilder lineBuilder = new StringBuilder();
+                string[] words = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string word in words)
+                {
+                    if (lineBuilder.Length == 0)
+                    {
+                        lineBuilder.Append(word);
+                        continue;
+                    }
+
+                    if (lineBuilder.Length + 1 + word.Length <= maxCharsPerLine)
+                    {
+                        lineBuilder.Append(' ');
+                        lineBuilder.Append(word);
+                    }
+                    else
+                    {
+                        wrappedLines.Add(lineBuilder.ToString());
+                        lineBuilder.Clear();
+                        lineBuilder.Append(word);
+                    }
+                }
+
+                if (lineBuilder.Length > 0)
+                    wrappedLines.Add(lineBuilder.ToString());
+            }
+
+            return wrappedLines;
+        }
+
+        private void AppendDisplayRows(ref List<Tuple<EDisplayRowKind, string>> rows, EDisplayRowKind rowKind, string text, int nodeLevel)
+        {
+            if (String.IsNullOrWhiteSpace(text))
+                return;
+
+            foreach (string line in GetWrappedDisplayNoteLines(text, nodeLevel))
+            {
+                rows.Add(Tuple.Create(rowKind, line));
+            }
+        }
+
+        private List<Tuple<EDisplayRowKind, string>> GetDisplayRowsForNode(DialogueNode dialogueNode, int nodeLevel)
+        {
+            List<Tuple<EDisplayRowKind, string>> rows = new List<Tuple<EDisplayRowKind, string>>();
+            if (dialogueNode == null)
+                return rows;
+
+            string context = "";
+            string comment = "";
+
+            if (dialogueNode is DialogueNodeSentence)
+            {
+                DialogueNodeSentence sentence = dialogueNode as DialogueNodeSentence;
+                context = sentence.Context;
+                comment = sentence.Comment;
+            }
+            else if (dialogueNode is DialogueNodeRoot)
+            {
+                context = Dialogue.Context;
+                comment = Dialogue.Comment;
+            }
+            else if (dialogueNode is DialogueNodeComment)
+            {
+                comment = (dialogueNode as DialogueNodeComment).Comment;
+
+                if (EditorCore.Settings.DisplayComments)
+                {
+                    List<string> lines = GetWrappedDisplayNoteLines(comment, nodeLevel);
+                    int startIndex = 0;
+                    if (EditorCore.Settings.DisplayText && lines.Count > 0)
+                        startIndex = 1; // First line is displayed in the main node row
+
+                    for (int i = startIndex; i < lines.Count; ++i)
+                        rows.Add(Tuple.Create(EDisplayRowKind.Comment, lines[i]));
+                }
+
+                return rows;
+            }
+
+            if (EditorCore.Settings.DisplayContext)
+                AppendDisplayRows(ref rows, EDisplayRowKind.Context, context, nodeLevel);
+
+            if (EditorCore.Settings.DisplayComments)
+                AppendDisplayRows(ref rows, EDisplayRowKind.Comment, comment, nodeLevel);
+
+            return rows;
+        }
+
+        private void StripDisplayRows(TreeNodeCollection nodes)
+        {
+            for (int i = nodes.Count - 1; i >= 0; --i)
+            {
+                TreeNode node = nodes[i];
+                if (IsDisplayTreeNode(node))
+                {
+                    nodes.RemoveAt(i);
+                }
+                else
+                {
+                    StripDisplayRows(node.Nodes);
+                }
+            }
+        }
+
+        private void RebuildDisplayRows(TreeNodeCollection nodes)
+        {
+            for (int i = 0; i < nodes.Count; ++i)
+            {
+                TreeNode node = nodes[i];
+                if (IsDisplayTreeNode(node))
+                    continue;
+
+                DialogueNode dialogueNode = GetDialogueNode(node);
+                List<Tuple<EDisplayRowKind, string>> rows = GetDisplayRowsForNode(dialogueNode, node.Level);
+                if (rows.Count > 0)
+                {
+                    bool insertAfterNode = dialogueNode is DialogueNodeComment;
+                    for (int rowIndex = 0; rowIndex < rows.Count; ++rowIndex)
+                    {
+                        int insertIndex = insertAfterNode
+                            ? (i + 1 + rowIndex)
+                            : (i + rowIndex);
+                        TreeNode displayNode = nodes.Insert(insertIndex, GetDisplayNodeKey(dialogueNode.ID), rows[rowIndex].Item2);
+                        displayNode.Tag = new NodeWrap(dialogueNode, rows[rowIndex].Item1, node);
+                        displayNode.ContextMenuStrip = contextMenu;
+                        displayNode.BackColor = tree.BackColor;
+                        displayNode.ForeColor = GetDisplayRowColor(rows[rowIndex].Item1);
+                        displayNode.ImageIndex = -1;
+                        displayNode.SelectedImageIndex = -1;
+                        displayNode.StateImageIndex = -1;
+                        displayNode.ImageKey = String.Empty;
+                        displayNode.SelectedImageKey = String.Empty;
+                        displayNode.StateImageKey = String.Empty;
+                    }
+
+                    i += rows.Count;
+                }
+
+                RebuildDisplayRows(node.Nodes);
+            }
+        }
+
+        private void RefreshDisplayRows(TreeNode preferredSelectedNode = null)
+        {
+            TreeNode selectedNode = GetRealTreeNode(preferredSelectedNode ?? tree.SelectedNode);
+
+            StripDisplayRows(tree.Nodes);
+            displayNodeKeyCounter = 0;
+            RebuildDisplayRows(tree.Nodes);
+
+            if (selectedNode != null)
+                SelectTreeNode(selectedNode);
         }
 
         private void OnTreeViewDrawNode(object sender, DrawTreeNodeEventArgs e)
@@ -1103,71 +1457,71 @@ namespace DialogueEditor
 
             var node = e.Node;
             var dialogueNode = GetDialogueNode(node);
+            bool isDisplayRow = IsDisplayTreeNode(node);
 
             Font nodeFont = node.NodeFont;
             if (nodeFont == null)
                 nodeFont = tree.Font;
 
+            Rectangle bounds = node.Bounds;
+            bounds.Width = tree.Width;
+            Rectangle paintBounds = bounds;
+            if (isDisplayRow)
+            {
+                paintBounds.X = 0;
+                paintBounds.Width = tree.ClientSize.Width;
+            }
+
+            if ((e.State & TreeNodeStates.Selected) != 0)
+            {
+                using (var brush = new SolidBrush(ThemeManager.Current.SelectionBackground))
+                {
+                    e.Graphics.FillRectangle(brush, paintBounds);
+                }
+            }
+            else
+            {
+                using (var brush = new SolidBrush(node.BackColor))
+                {
+                    e.Graphics.FillRectangle(brush, paintBounds);
+                }
+            }
+
+            if (isDisplayRow)
+            {
+                var wrap = node.Tag as NodeWrap;
+                FontStyle style = FontStyle.Italic;
+                if ((nodeFont.Style & FontStyle.Bold) == FontStyle.Bold)
+                    style |= FontStyle.Bold;
+
+                float displayFontSize = Math.Max(6.0f, nodeFont.Size - 1.0f);
+                using (var displayFont = new Font(nodeFont.FontFamily, displayFontSize, style, nodeFont.Unit))
+                {
+                    int x = Math.Max(0, bounds.Location.X - GetDisplayRowIconOffset());
+                    int y = bounds.Location.Y + (IsDisplayRowInsertedBeforeOwner(node) ? 3 : 1);
+                    Point location = new Point(x, y);
+                    DrawText(ref location, node.Text, e.Graphics, displayFont, GetDisplayRowColor(wrap.DisplayRowKind));
+                }
+                return;
+            }
+
             // Retrieve texts
             string textID = GetTreeNodeTextID(dialogueNode);
             string textAttributes = GetTreeNodeTextAttributes(dialogueNode);
             string textActors = GetTreeNodeTextActors(dialogueNode);
-            string textContent = GetTreeNodeTextContent(dialogueNode);
+            string textContent = GetTreeNodeTextContent(dialogueNode, node.Level);
 
-            // Highlight
-            Rectangle bounds = node.Bounds;
-            bounds.Width = 0;
-            int nbParts = 0;
+            int mainYOffset = 1;
+            if (HasAttachedDisplayRowsAbove(node))
+                mainYOffset = 0;
+            else if (HasAttachedDisplayRowsBelow(node))
+                mainYOffset = 3;
 
-            if (textID != String.Empty)
-            {
-                bounds.Width += TextRenderer.MeasureText(e.Graphics, textID, nodeFont).Width;
-                //bounds.Width += e.Graphics.MeasureString(textID, nodeFont).ToSize().Width;
-                nbParts += 1;
-            }
-
-            if (textAttributes != String.Empty)
-            {
-                bounds.Width += TextRenderer.MeasureText(e.Graphics, textAttributes, nodeFont).Width;
-                //bounds.Width += e.Graphics.MeasureString(textAttributes, nodeFont).ToSize().Width;
-                nbParts += 1;
-            }
-
-            if (textActors != String.Empty)
-            {
-                bounds.Width += TextRenderer.MeasureText(e.Graphics, textActors, nodeFont).Width;
-                //bounds.Width += e.Graphics.MeasureString(textActors, nodeFont).ToSize().Width;
-                nbParts += 1;
-            }
-
-            if (textContent != String.Empty)
-            {
-                bounds.Width += TextRenderer.MeasureText(e.Graphics, textContent, nodeFont).Width;
-                //bounds.Width += e.Graphics.MeasureString(textContent, nodeFont).ToSize().Width;
-                nbParts += 1;
-            }
-
-            //if (nbParts > 1)
-            //    bounds.Width -= 6 * (nbParts - 1);  //Hack to adjust actual width and match drawn content
-            bounds.Width = (int)(bounds.Width * 1.05);
-            bounds.Width = tree.Width;
-
-            if ((e.State & TreeNodeStates.Selected) != 0)
-            //if ((e.State & TreeNodeStates.Focused) != 0)
-            {
-                e.Graphics.FillRectangle(Brushes.LightBlue, bounds);
-            }
-            else
-            {
-                e.Graphics.FillRectangle(new SolidBrush(node.BackColor), bounds);
-            }
-
-            // Draw Text
-            Point location = bounds.Location;
-            DrawText(ref location, textID, e.Graphics, nodeFont, Color.Black);
-            DrawText(ref location, textAttributes, e.Graphics, nodeFont, Color.MediumOrchid);
-            DrawText(ref location, textActors, e.Graphics, nodeFont, Color.DimGray);
-            DrawText(ref location, textContent, e.Graphics, nodeFont, GetTreeNodeColorContent(dialogueNode));
+            Point locationMain = new Point(bounds.Location.X, bounds.Location.Y + mainYOffset);
+            DrawText(ref locationMain, textID, e.Graphics, nodeFont, Color.Black);
+            DrawText(ref locationMain, textAttributes, e.Graphics, nodeFont, Color.MediumOrchid);
+            DrawText(ref locationMain, textActors, e.Graphics, nodeFont, Color.DimGray);
+            DrawText(ref locationMain, textContent, e.Graphics, nodeFont, GetTreeNodeColorContent(dialogueNode));
         }
 
         private void DrawText(ref Point location, string text, Graphics g, Font font, Color color)
@@ -1195,6 +1549,13 @@ namespace DialogueEditor
             }
 
             labelFont.Text = String.Format("{0} {1}", tree.Font.Name, tree.Font.Size);
+            UpdateTreeItemHeight();
+        }
+
+        private void UpdateTreeItemHeight()
+        {
+            int lineHeight = Math.Max(16, TextRenderer.MeasureText("Ag", tree.Font).Height);
+            tree.ItemHeight = Math.Max(16, lineHeight);
         }
 
         public void Highlight(TreeNode node)
@@ -1256,10 +1617,105 @@ namespace DialogueEditor
             return "Node_" + nodeID.ToString();
         }
 
+        protected string GetDisplayNodeKey(int nodeID)
+        {
+            ++displayNodeKeyCounter;
+            return String.Format("Display_{0}_{1}", nodeID, displayNodeKeyCounter);
+        }
+
+        protected bool IsDisplayTreeNode(TreeNode node)
+        {
+            if (node == null || node.Tag == null)
+                return false;
+
+            NodeWrap wrap = node.Tag as NodeWrap;
+            return wrap != null && wrap.IsDisplayRow;
+        }
+
+        protected TreeNode GetDisplayRowOwner(TreeNode node)
+        {
+            if (!IsDisplayTreeNode(node))
+                return null;
+
+            NodeWrap wrap = node.Tag as NodeWrap;
+            return wrap?.OwnerTreeNode;
+        }
+
+        protected bool IsDisplayRowInsertedBeforeOwner(TreeNode node)
+        {
+            TreeNode owner = GetDisplayRowOwner(node);
+            if (owner == null)
+                return false;
+
+            return node.Parent == owner.Parent && node.Index < owner.Index;
+        }
+
+        protected bool HasAttachedDisplayRowsAbove(TreeNode node)
+        {
+            TreeNode current = node?.PrevNode;
+            while (current != null && IsDisplayTreeNode(current))
+            {
+                if (GetDisplayRowOwner(current) == node)
+                    return true;
+                current = current.PrevNode;
+            }
+
+            return false;
+        }
+
+        protected bool HasAttachedDisplayRowsBelow(TreeNode node)
+        {
+            TreeNode current = node?.NextNode;
+            while (current != null && IsDisplayTreeNode(current))
+            {
+                if (GetDisplayRowOwner(current) == node)
+                    return true;
+                current = current.NextNode;
+            }
+
+            return false;
+        }
+
+        protected int GetDisplayRowIconOffset()
+        {
+            if (tree.ImageList == null)
+                return 0;
+
+            return Math.Max(0, tree.ImageList.ImageSize.Width + 3);
+        }
+
+        protected TreeNode GetRealTreeNode(TreeNode node)
+        {
+            if (!IsDisplayTreeNode(node))
+                return node;
+
+            NodeWrap wrap = node.Tag as NodeWrap;
+            return wrap?.OwnerTreeNode;
+        }
+
+        protected TreeNode GetPreviousRealSibling(TreeNode node)
+        {
+            TreeNode current = node?.PrevNode;
+            while (current != null && IsDisplayTreeNode(current))
+                current = current.PrevNode;
+            return current;
+        }
+
+        protected TreeNode GetNextRealSibling(TreeNode node)
+        {
+            TreeNode current = node?.NextNode;
+            while (current != null && IsDisplayTreeNode(current))
+                current = current.NextNode;
+            return current;
+        }
+
         protected TreeNode GetRootNode()
         {
-            if (tree.Nodes.Count > 0)
-                return tree.Nodes[0];    // GetNodeKey(m_pDialogue.RootNode.ID);
+            foreach (TreeNode node in tree.Nodes)
+            {
+                if (!IsDisplayTreeNode(node) && node.Tag != null && ((NodeWrap)node.Tag).DialogueNode is DialogueNodeRoot)
+                    return node;
+            }
             return null;
         }
 
@@ -1285,7 +1741,8 @@ namespace DialogueEditor
 
         public DialogueNode GetDialogueNode(TreeNode node)
         {
-            if (node != null)
+            node = GetRealTreeNode(node);
+            if (node != null && node.Tag != null)
             {
                 return ((NodeWrap)node.Tag).DialogueNode;
             }
@@ -1294,53 +1751,47 @@ namespace DialogueEditor
 
         public DialogueNode GetSelectedDialogueNode()
         {
-            if (tree.SelectedNode != null)
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+            if (selectedNode != null && selectedNode.Tag != null)
             {
-                return ((NodeWrap)tree.SelectedNode.Tag).DialogueNode;
+                return ((NodeWrap)selectedNode.Tag).DialogueNode;
             }
             return null;
         }
 
         protected bool IsTreeNodeRoot(TreeNode node)
         {
-            if (((NodeWrap)node.Tag).DialogueNode is DialogueNodeRoot)
-                return true;
-            return false;
+            return GetDialogueNode(node) is DialogueNodeRoot;
         }
 
         protected bool IsTreeNodeSentence(TreeNode node)
         {
-            if (((NodeWrap)node.Tag).DialogueNode is DialogueNodeSentence)
-                return true;
-            return false;
+            return GetDialogueNode(node) is DialogueNodeSentence;
         }
 
         protected bool IsTreeNodeChoice(TreeNode node)
         {
-            if (((NodeWrap)node.Tag).DialogueNode is DialogueNodeChoice)
-                return true;
-            return false;
+            return GetDialogueNode(node) is DialogueNodeChoice;
         }
 
         protected bool IsTreeNodeReply(TreeNode node)
         {
-            if (((NodeWrap)node.Tag).DialogueNode is DialogueNodeReply)
-                return true;
-            return false;
+            return GetDialogueNode(node) is DialogueNodeReply;
         }
 
         protected bool IsTreeNodeGoto(TreeNode node)
         {
-            if (((NodeWrap)node.Tag).DialogueNode is DialogueNodeGoto)
-                return true;
-            return false;
+            return GetDialogueNode(node) is DialogueNodeGoto;
         }
 
         protected bool IsTreeNodeBranch(TreeNode node)
         {
-            if (((NodeWrap)node.Tag).DialogueNode is DialogueNodeBranch)
-                return true;
-            return false;
+            return GetDialogueNode(node) is DialogueNodeBranch;
+        }
+
+        protected bool IsTreeNodeComment(TreeNode node)
+        {
+            return GetDialogueNode(node) is DialogueNodeComment;
         }
 
         private void ResyncDisplayOptions()
@@ -1369,6 +1820,8 @@ namespace DialogueEditor
             checkBoxDisplayActions.Checked = EditorCore.Settings.DisplayActions;
             checkBoxDisplayFlags.Checked = EditorCore.Settings.DisplayFlags;
             checkBoxDisplayText.Checked = EditorCore.Settings.DisplayText;
+            checkBoxDisplayContext.Checked = EditorCore.Settings.DisplayContext;
+            checkBoxDisplayComments.Checked = EditorCore.Settings.DisplayComments;
             checkBoxUseActorColors.Checked = EditorCore.Settings.UseActorColors;
             checkBoxUseConstants.Checked = EditorCore.Settings.UseConstants;
 
@@ -1460,7 +1913,8 @@ namespace DialogueEditor
                     if (IsTreeNodeSentence(tree.SelectedNode)
                     || IsTreeNodeChoice(tree.SelectedNode)
                     || IsTreeNodeReply(tree.SelectedNode)
-                    || IsTreeNodeBranch(tree.SelectedNode))
+                    || IsTreeNodeBranch(tree.SelectedNode)
+                    || IsTreeNodeComment(tree.SelectedNode))
                     {
                         if (EditorCore.Properties != null)
                             EditorCore.Properties.ForceFocus();
@@ -1627,6 +2081,8 @@ namespace DialogueEditor
                         newTreeNode = AddNodeBranch(tree.SelectedNode, firsNode as DialogueNodeBranch, asBranch);
                     else if (firsNode is DialogueNodeReturn)
                         newTreeNode = AddNodeReturn(tree.SelectedNode, firsNode as DialogueNodeReturn, asBranch);
+                    else if (firsNode is DialogueNodeComment)
+                        newTreeNode = AddNodeComment(tree.SelectedNode, firsNode as DialogueNodeComment, asBranch);
 
                     if (dialogueNode is DialogueNodeRoot)
                     {
@@ -1705,6 +2161,16 @@ namespace DialogueEditor
 
                     SetDirty();
                 }
+                else if (EditorHelper.Clipboard is DialogueNodeComment)
+                {
+                    var newNode = (EditorHelper.Clipboard as DialogueNodeComment).Clone() as DialogueNodeComment;
+                    Dialogue.AddNode(newNode);
+
+                    var newTreeNode = AddNodeComment(tree.SelectedNode, newNode, asBranch);
+                    SelectTreeNode(newTreeNode);
+
+                    SetDirty();
+                }
             }
             else if (e.Control && e.KeyCode == Keys.Z)
             {
@@ -1731,12 +2197,45 @@ namespace DialogueEditor
 
         private void OnNodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
         {
-            SelectTreeNode(e.Node);     //Will trigger OnNodeSelect
+            TreeNode clickedNode = ResolveTreeNodeFromPoint(e.Location) ?? GetRealTreeNode(e.Node);
+            if (clickedNode != null)
+                SelectTreeNode(clickedNode);     //Will trigger OnNodeSelect
+        }
+
+        private void OnTreeMouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Right)
+                return;
+
+            TreeNode clickedNode = ResolveTreeNodeFromPoint(e.Location);
+            if (clickedNode != null)
+                SelectTreeNode(clickedNode);
+        }
+
+        private TreeNode ResolveTreeNodeFromPoint(Point location)
+        {
+            TreeNode hitNode = tree.GetNodeAt(location);
+            if (hitNode == null && location.Y >= 0 && location.Y < tree.ClientSize.Height)
+            {
+                // Keep the same row selection even when clicking outside the label bounds.
+                int probeX = Math.Max(1, tree.Indent + 1);
+                hitNode = tree.GetNodeAt(probeX, location.Y);
+            }
+
+            return GetRealTreeNode(hitNode);
         }
 
         private void OnNodeSelect(object sender, TreeViewEventArgs e)
         {
+            TreeNode selectedNode = GetRealTreeNode(e.Node);
+            if (selectedNode != e.Node)
+            {
+                SelectTreeNode(selectedNode);
+                return;
+            }
+
             ResyncSelectedNode();
+            SelectedNodeChanged?.Invoke(this, GetSelectedDialogueNode());
         }
 
         private void OnNodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
@@ -1753,8 +2252,12 @@ namespace DialogueEditor
 
         private void OnNodeCollapse(object sender, TreeViewCancelEventArgs e)
         {
+            TreeNode node = GetRealTreeNode(e.Node);
+            if (node == null)
+                return;
+
             //Forbid the collapsing of desired nodes
-            if (((NodeWrap)e.Node.Tag).DialogueNode is DialogueNodeRoot)
+            if (((NodeWrap)node.Tag).DialogueNode is DialogueNodeRoot)
             {
                 e.Cancel = true;
             }
@@ -1776,6 +2279,7 @@ namespace DialogueEditor
             menuItemAddChoice.Visible = false;
             menuItemAddGoto.Visible = false;
             menuItemAddBranch.Visible = false;
+            menuItemAddComment.Visible = false;
             menuItemAddReturn.Visible = false;
 
             separatorReference.Visible = false;
@@ -1790,7 +2294,12 @@ namespace DialogueEditor
             separatorDelete.Visible = false;
             menuItemDelete.Visible = false;
 
-            DialogueNode node = ((NodeWrap)tree.SelectedNode.Tag).DialogueNode;
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+            if (selectedNode == null)
+                return;
+            SelectTreeNode(selectedNode);
+
+            DialogueNode node = ((NodeWrap)selectedNode.Tag).DialogueNode;
 
             //Node Insertion
             if (node is DialogueNodeRoot
@@ -1799,12 +2308,14 @@ namespace DialogueEditor
             || node is DialogueNodeReply
             || node is DialogueNodeGoto
             || node is DialogueNodeBranch
+            || node is DialogueNodeComment
             || node is DialogueNodeReturn)
             {
                 menuItemAddSentence.Visible = true;
                 menuItemAddChoice.Visible = true;
                 menuItemAddGoto.Visible = true;
                 menuItemAddBranch.Visible = true;
+                menuItemAddComment.Visible = true;
                 menuItemAddReturn.Visible = true;
             }
 
@@ -1841,6 +2352,7 @@ namespace DialogueEditor
             else if (node is DialogueNodeSentence
                 || node is DialogueNodeChoice
                 || node is DialogueNodeBranch
+                || node is DialogueNodeComment
                 || node is DialogueNodeReturn)
             {
                 separatorReference.Visible = true;
@@ -1912,6 +2424,11 @@ namespace DialogueEditor
             CreateNodeReturn(tree.SelectedNode, false);
         }
 
+        private void OnAddNodeComment(object sender, EventArgs e)
+        {
+            CreateNodeComment(tree.SelectedNode, false);
+        }
+
         private void OnBranchNodeSentence(object sender, EventArgs e)
         {
             DialogueNodeBranch nodeBranch = GetDialogueNode(tree.SelectedNode) as DialogueNodeBranch;
@@ -1948,6 +2465,15 @@ namespace DialogueEditor
             CreateNodeBranch(tree.SelectedNode, true);
         }
 
+        private void OnBranchNodeComment(object sender, EventArgs e)
+        {
+            DialogueNodeBranch nodeBranch = GetDialogueNode(tree.SelectedNode) as DialogueNodeBranch;
+            if (nodeBranch == null)
+                return;
+
+            CreateNodeComment(tree.SelectedNode, true);
+        }
+
         protected void OnDeleteNode(object sender, EventArgs e)
         {
             RemoveNode(tree.SelectedNode);
@@ -1955,16 +2481,21 @@ namespace DialogueEditor
 
         protected virtual void OnCopyReference(object sender, EventArgs e)
         {
-            DialogueNode dialogueNode = ((NodeWrap)tree.SelectedNode.Tag).DialogueNode;
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+            if (selectedNode == null)
+                return;
+
+            DialogueNode dialogueNode = ((NodeWrap)selectedNode.Tag).DialogueNode;
             copyReference = dialogueNode.ID;
         }
 
         protected virtual void OnPasteReference(object sender, EventArgs e)
         {
-            if (!IsTreeNodeGoto(tree.SelectedNode))
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+            if (!IsTreeNodeGoto(selectedNode))
                 return;
 
-            DialogueNodeGoto nodeGoto = ((NodeWrap)tree.SelectedNode.Tag).DialogueNode as DialogueNodeGoto;
+            DialogueNodeGoto nodeGoto = ((NodeWrap)selectedNode.Tag).DialogueNode as DialogueNodeGoto;
 
             DialogueNode newTarget = Dialogue.GetNodeByID(copyReference);
             if (newTarget != null)
@@ -1972,7 +2503,7 @@ namespace DialogueEditor
                 DialogueNode oldTarget = nodeGoto.Goto;
                 nodeGoto.Goto = newTarget;
 
-                RefreshTreeNode(tree.SelectedNode);
+                RefreshTreeNode(selectedNode);
                 RefreshTreeNode(GetTreeNode(oldTarget));
                 RefreshTreeNode(GetTreeNode(newTarget));
 
@@ -1982,16 +2513,22 @@ namespace DialogueEditor
 
         protected virtual void OnMoveNodeUp(object sender, EventArgs e)
         {
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+            if (selectedNode == null)
+                return;
+
             bool moved = false;
-            if (tree.SelectedNode.PrevNode != null)
+            TreeNode previousRealNode = GetPreviousRealSibling(selectedNode);
+            if (previousRealNode != null)
             {
-                if (tree.SelectedNode.PrevNode.PrevNode != null)
+                TreeNode previousPreviousRealNode = GetPreviousRealSibling(previousRealNode);
+                if (previousPreviousRealNode != null)
                 {
-                    moved = MoveTreeNode(tree.SelectedNode, tree.SelectedNode.PrevNode.PrevNode, EMoveTreeNode.Sibling);
+                    moved = MoveTreeNode(selectedNode, previousPreviousRealNode, EMoveTreeNode.Sibling);
                 }
                 else
                 {
-                    moved = MoveTreeNode(tree.SelectedNode, tree.SelectedNode.Parent, EMoveTreeNode.Sibling);
+                    moved = MoveTreeNode(selectedNode, selectedNode.Parent, EMoveTreeNode.Sibling);
                 }
             }
 
@@ -2001,10 +2538,15 @@ namespace DialogueEditor
 
         protected virtual void OnMoveNodeDown(object sender, EventArgs e)
         {
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+            if (selectedNode == null)
+                return;
+
             bool moved = false;
-            if (tree.SelectedNode.NextNode != null)
+            TreeNode nextRealNode = GetNextRealSibling(selectedNode);
+            if (nextRealNode != null)
             {
-                moved = MoveTreeNode(tree.SelectedNode, tree.SelectedNode.NextNode, EMoveTreeNode.Sibling);
+                moved = MoveTreeNode(selectedNode, nextRealNode, EMoveTreeNode.Sibling);
             }
 
             if (moved)
@@ -2023,10 +2565,14 @@ namespace DialogueEditor
             EditorCore.Settings.DisplayFlags = checkBoxDisplayFlags.Checked;
             EditorCore.Settings.DisplayID = checkBoxDisplayID.Checked;
             EditorCore.Settings.DisplayText = checkBoxDisplayText.Checked;
+            EditorCore.Settings.DisplayContext = checkBoxDisplayContext.Checked;
+            EditorCore.Settings.DisplayComments = checkBoxDisplayComments.Checked;
             EditorCore.Settings.UseActorColors = checkBoxUseActorColors.Checked;
             EditorCore.Settings.UseConstants = checkBoxUseConstants.Checked;
 
+            UpdateTreeItemHeight();
             RefreshAllTreeNodes();
+            DialogueChanged?.Invoke(this);
         }
 
         private void OnChangeFont(object sender, EventArgs e)
@@ -2073,17 +2619,24 @@ namespace DialogueEditor
 
         private void OnCopyID(object sender, EventArgs e)
         {
-            DialogueNode dialogueNode = ((NodeWrap)tree.SelectedNode.Tag).DialogueNode;
+            TreeNode selectedNode = GetRealTreeNode(tree.SelectedNode);
+            if (selectedNode == null)
+                return;
+
+            DialogueNode dialogueNode = ((NodeWrap)selectedNode.Tag).DialogueNode;
             Clipboard.SetText(EditorHelper.GetPrettyNodeID(Dialogue, dialogueNode));
         }
 
         private void OnTreeItemDrag(object sender, ItemDragEventArgs e)
         {
             //EditorCore.LogInfo("Start Dragging");
+            TreeNode nodeMove = GetRealTreeNode(e.Item as TreeNode);
+            if (nodeMove == null)
+                return;
 
-            if (!IsTreeNodeRoot(e.Item as TreeNode))
+            if (!IsTreeNodeRoot(nodeMove))
             {
-                DoDragDrop(e.Item, DragDropEffects.Move);
+                DoDragDrop(nodeMove, DragDropEffects.Move);
             }
         }
 
@@ -2107,6 +2660,9 @@ namespace DialogueEditor
 
         private bool CanMoveTreeNode(TreeNode nodeMove, TreeNode nodeTarget)
         {
+            nodeMove = GetRealTreeNode(nodeMove);
+            nodeTarget = GetRealTreeNode(nodeTarget);
+
             if (nodeMove == null || nodeTarget == null || nodeMove == nodeTarget)
                 return false;
 
@@ -2129,10 +2685,10 @@ namespace DialogueEditor
         {
             //EditorCore.LogInfo("Start Dropping");
 
-            TreeNode nodeMove = (TreeNode)e.Data.GetData(typeof(TreeNode));
+            TreeNode nodeMove = GetRealTreeNode((TreeNode)e.Data.GetData(typeof(TreeNode)));
 
             Point targetPoint = tree.PointToClient(new Point(e.X, e.Y));
-            TreeNode nodeTarget = tree.GetNodeAt(targetPoint);
+            TreeNode nodeTarget = GetRealTreeNode(tree.GetNodeAt(targetPoint));
 
             //e.Effect = DragDropEffects.Move;
 

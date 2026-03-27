@@ -19,6 +19,7 @@ namespace DialogueEditor
         public PanelProperties()
         {
             InitializeComponent();
+            ThemeManager.ApplyTheme(this);
         }
 
         public void Clear()
@@ -119,6 +120,18 @@ namespace DialogueEditor
             else if (dialogueNode is DialogueNodeReturn)
             {
                 DialogueNodeReturn castNode = dialogueNode as DialogueNodeReturn;
+
+                FormPropertiesCommon propertiesCommon = new FormPropertiesCommon();
+                propertiesCommon.Init(document, treeNode, castNode);
+                layoutPanel.Controls.Add(propertiesCommon);
+            }
+            else if (dialogueNode is DialogueNodeComment)
+            {
+                DialogueNodeComment castNode = dialogueNode as DialogueNodeComment;
+
+                FormPropertiesComment properties = new FormPropertiesComment();
+                properties.Init(document, treeNode, castNode);
+                layoutPanel.Controls.Add(properties);
 
                 FormPropertiesCommon propertiesCommon = new FormPropertiesCommon();
                 propertiesCommon.Init(document, treeNode, castNode);

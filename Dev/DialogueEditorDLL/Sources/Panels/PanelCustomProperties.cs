@@ -19,6 +19,7 @@ namespace DialogueEditor
         public PanelCustomProperties()
         {
             InitializeComponent();
+            ThemeManager.ApplyTheme(this);
         }
 
         public void Clear()

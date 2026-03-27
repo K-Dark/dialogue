@@ -42,6 +42,7 @@ namespace DialogueEditor
         public DocumentProject()
         {
             InitializeComponent();
+            ThemeManager.ApplyTheme(this);
 
             EditorHelper.AbsorbMouseWheelEvent(comboBoxSpecies);
             EditorHelper.AbsorbMouseWheelEvent(comboBoxGender);

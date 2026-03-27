@@ -31,6 +31,8 @@ namespace DialogueEditor
         public bool DisplayFlags { get; set; }
         public bool DisplayID { get; set; }
         public bool DisplayText { get; set; }
+        public bool DisplayContext { get; set; }
+        public bool DisplayComments { get; set; }
 
         public bool UseActorColors { get; set; }
         public bool UseConstants { get; set; }
@@ -63,6 +65,8 @@ namespace DialogueEditor
             DisplayFlags = false;
             DisplayID = false;
             DisplayText = true;
+            DisplayContext = false;
+            DisplayComments = false;
 
             UseActorColors = false;
             UseConstants = false;

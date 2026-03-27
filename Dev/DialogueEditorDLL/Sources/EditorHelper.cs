@@ -27,6 +27,7 @@ namespace DialogueEditor
         Reply,
         Goto,
         Branch,
+        Comment,
 
         ListRootConditions,
         ListRootActions,
@@ -248,6 +249,7 @@ namespace DialogueEditor
                 case ENodeIcon.Reply:               name = "DotBlack";      break;
                 case ENodeIcon.Goto:                name = "ArrowBlack";    break;
                 case ENodeIcon.Branch:              name = "DiamondBlack";  break;
+                case ENodeIcon.Comment:             name = "note";          break;
 
                 case ENodeIcon.ListRootConditions:  name = "shield";        break;
                 case ENodeIcon.ListRootActions:     name = "lightning";     break;

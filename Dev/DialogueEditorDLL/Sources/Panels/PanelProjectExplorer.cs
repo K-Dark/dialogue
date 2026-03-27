@@ -51,6 +51,7 @@ namespace DialogueEditor
         public PanelProjectExplorer()
         {
             InitializeComponent();
+            ThemeManager.ApplyTheme(this);
 
             EditorHelper.AbsorbMouseWheelEvent(comboBoxSearchSceneType);
             EditorHelper.AbsorbMouseWheelEvent(comboBoxSearchActor);

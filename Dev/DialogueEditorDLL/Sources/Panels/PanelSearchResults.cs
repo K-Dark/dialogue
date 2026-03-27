@@ -37,6 +37,7 @@ namespace DialogueEditor
         public PanelSearchResults()
         {
             InitializeComponent();
+            ThemeManager.ApplyTheme(this);
 
             font = listBoxLog.Font;
             listBoxLog.DrawMode = DrawMode.OwnerDrawFixed;
@@ -121,7 +122,12 @@ namespace DialogueEditor
             e.DrawBackground();
 
             if (e.State.HasFlag(DrawItemState.Selected))
-                g.FillRectangle(new SolidBrush(Color.LightBlue), e.Bounds);
+            {
+                using (var brush = new SolidBrush(ThemeManager.Current.SelectionBackground))
+                {
+                    g.FillRectangle(brush, e.Bounds);
+                }
+            }
             //else
             //    g.FillRectangle(new SolidBrush(e.BackColor), e.Bounds);
 

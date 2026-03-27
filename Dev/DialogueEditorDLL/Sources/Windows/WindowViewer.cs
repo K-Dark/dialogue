@@ -48,6 +48,7 @@ namespace DialogueEditor
         public WindowViewer(Dialogue dialogue, DialogueNode nodeFrom, DocumentDialogue document)
         {
             InitializeComponent();
+            ThemeManager.ApplyTheme(this);
 
             comboBoxOptionConditions.DataSource = new BindingSource(Enum.GetValues(typeof(EOptionConditions)), null);
 
@@ -290,6 +291,11 @@ namespace DialogueEditor
                 else
                     labelSentence.Text = sentence.Sentence;
             }
+            else if (currentNode is DialogueNodeComment)
+            {
+                var nodeComment = currentNode as DialogueNodeComment;
+                PlayNode(nodeComment.Next);
+            }
             else if (currentNode is DialogueNodeChoice)
             {
                 var nodeChoice = currentNode as DialogueNodeChoice;
@@ -488,6 +494,10 @@ namespace DialogueEditor
                 {
                     return GetGotoText((node as DialogueNodeGoto).Goto);
                 }
+                else if (node is DialogueNodeComment)
+                {
+                    return (node as DialogueNodeComment).Comment;
+                }
             }
             return "";
         }
@@ -562,7 +572,12 @@ namespace DialogueEditor
             e.DrawBackground();
 
             if (e.State.HasFlag(DrawItemState.Selected))
-                g.FillRectangle(new SolidBrush(Color.LightBlue), e.Bounds);
+            {
+                using (var brush = new SolidBrush(ThemeManager.Current.SelectionBackground))
+                {
+                    g.FillRectangle(brush, e.Bounds);
+                }
+            }
             //else
             //    g.FillRectangle(new SolidBrush(Color.White), e.Bounds);
 
