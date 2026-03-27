@@ -86,6 +86,7 @@ namespace DialogueEditor
             Dialogue = inDialogue;
             Name = Dialogue.GetName();
             tree.ImageList = EditorCore.DefaultImageList;
+            InitializeWpfTreeHost();
 
             //Use this to have multiple colors on a single node.
             //If there are visual glitches, you can try commenting this block.
@@ -101,7 +102,7 @@ namespace DialogueEditor
             SaveState();
 
             ResyncDisplayOptions();
-            ResyncDocument(false);
+            ResyncDocument(useWpfDialogueTree);
             SelectRootNode();
             RefreshTitle();
         }
@@ -201,6 +202,8 @@ namespace DialogueEditor
             {
                 RefreshAllTreeNodes();
             }
+
+            RefreshWpfTreeHost();
         }
 
         public void CreateNodeSentence(TreeNode treeNodeFrom, bool branch)
@@ -892,6 +895,7 @@ namespace DialogueEditor
                 return;
 
             tree.SelectedNode = treeNode;
+            SyncWpfTreeSelection();
         }
 
         public void ResyncSelectedNode()
@@ -923,6 +927,7 @@ namespace DialogueEditor
 
             EditorCore.Properties?.ShowDialogueNodeProperties(this, selectedNode, ((NodeWrap)selectedNode.Tag).DialogueNode);
             EditorCore.CustomProperties?.ShowDialogueNodeProperties(this, selectedNode, ((NodeWrap)selectedNode.Tag).DialogueNode);
+            RefreshWpfTreeHost();
 
             //tree.EndUpdate();
         }
@@ -932,6 +937,8 @@ namespace DialogueEditor
             TreeNode rootNode = GetRootNode();
             if (rootNode != null)
                 RefreshAllTreeNodes(rootNode);
+            else
+                RefreshWpfTreeHost();
         }
 
         public void RefreshAllTreeNodes(TreeNode parent)
@@ -954,6 +961,7 @@ namespace DialogueEditor
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
             this.Refresh();
+            RefreshWpfTreeHost();
         }
 
         public void RefreshTreeNode(TreeNode treeNode)
@@ -974,6 +982,7 @@ namespace DialogueEditor
             tree.EndUpdate();
             WIN32.ResumeRedraw(this);
             this.Refresh();
+            RefreshWpfTreeHost();
         }
 
         public void RefreshTreeNodeForWorkstringEdit(TreeNode treeNode)
@@ -2234,6 +2243,7 @@ namespace DialogueEditor
                 return;
             }
 
+            SyncWpfTreeSelection();
             ResyncSelectedNode();
             SelectedNodeChanged?.Invoke(this, GetSelectedDialogueNode());
         }

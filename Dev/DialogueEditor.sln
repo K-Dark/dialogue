@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DialogueEditorDLL", "DialogueEditorDLL\DialogueEditorDLL.csproj", "{3E9E660C-96FD-4EB3-8643-C072CFA7B3B6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DialogueEditorWpfTree", "DialogueEditorWpfTree\DialogueEditorWpfTree.csproj", "{A81A7F4A-44A4-4838-BDD2-1C460EC257E2}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestSingleWindow", "TestSingleWindow\TestSingleWindow.csproj", "{46D21066-F264-4A7F-9F6D-95F6ACDA38AD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DefaultBuild", "DefaultBuild\DefaultBuild.csproj", "{989D3BF1-A4EE-4414-A010-B697B91EBF56}"
@@ -21,6 +23,10 @@ Global
 		{3E9E660C-96FD-4EB3-8643-C072CFA7B3B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3E9E660C-96FD-4EB3-8643-C072CFA7B3B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3E9E660C-96FD-4EB3-8643-C072CFA7B3B6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A81A7F4A-44A4-4838-BDD2-1C460EC257E2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A81A7F4A-44A4-4838-BDD2-1C460EC257E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A81A7F4A-44A4-4838-BDD2-1C460EC257E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A81A7F4A-44A4-4838-BDD2-1C460EC257E2}.Release|Any CPU.Build.0 = Release|Any CPU
 		{46D21066-F264-4A7F-9F6D-95F6ACDA38AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{46D21066-F264-4A7F-9F6D-95F6ACDA38AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{46D21066-F264-4A7F-9F6D-95F6ACDA38AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
