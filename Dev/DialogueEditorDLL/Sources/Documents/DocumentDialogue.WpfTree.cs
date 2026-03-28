@@ -22,6 +22,16 @@ namespace DialogueEditor
         private ElementHost wpfTreeHost;
         private WpfDialogueTreeView wpfTreeView;
 
+        private sealed class BranchRenderContext
+        {
+            public int ReplyIndex { get; private set; }
+
+            public BranchRenderContext(int replyIndex)
+            {
+                ReplyIndex = replyIndex;
+            }
+        }
+
         private void InitializeWpfTreeHost()
         {
             useWpfDialogueTree = EditorCore.Settings != null && EditorCore.Settings.UseWpfDialogueTree;
@@ -86,11 +96,11 @@ namespace DialogueEditor
         private List<WpfDialogueTreeRow> BuildWpfTreeRows(TreeNode selectedTreeNode)
         {
             List<WpfDialogueTreeRow> rows = new List<WpfDialogueTreeRow>();
-            BuildWpfTreeRows(rows, tree.Nodes, selectedTreeNode);
+            BuildWpfTreeRows(rows, tree.Nodes, selectedTreeNode, null);
             return rows;
         }
 
-        private void BuildWpfTreeRows(List<WpfDialogueTreeRow> rows, TreeNodeCollection nodes, TreeNode selectedTreeNode)
+        private void BuildWpfTreeRows(List<WpfDialogueTreeRow> rows, TreeNodeCollection nodes, TreeNode selectedTreeNode, List<BranchRenderContext> activeBranchContexts)
         {
             if (nodes == null)
                 return;
@@ -117,6 +127,16 @@ namespace DialogueEditor
                 SolidColorBrush attributesBrush = null;
                 SolidColorBrush actorsBrush = null;
                 SolidColorBrush contentBrush = null;
+                SolidColorBrush typeTagBrush = null;
+                SolidColorBrush accentBrush = null;
+                SolidColorBrush branchBackgroundBrush = null;
+                SolidColorBrush branchBorderBrush = null;
+                Thickness branchBorderThickness = new Thickness(0);
+                SolidColorBrush branchRailBrush1 = null;
+                SolidColorBrush branchRailBrush2 = null;
+                SolidColorBrush branchRailBrush3 = null;
+                SolidColorBrush branchRailBrush4 = null;
+                string typeTagText = string.Empty;
 
                 if (!wrap.IsDisplayRow)
                 {
@@ -139,6 +159,12 @@ namespace DialogueEditor
                     actorsBrush = contentBrush;
                 }
 
+                ResolveRowTemplateStyle(node, wrap, out typeTagText, out typeTagBrush, out accentBrush);
+
+                branchBackgroundBrush = ConvertBrush(System.Drawing.Color.Transparent);
+                branchBorderBrush = ConvertBrush(System.Drawing.Color.Transparent);
+                branchBorderThickness = new Thickness(0);
+
                 bool hasChildren = !wrap.IsDisplayRow && HasRealChildNodes(node);
                 bool isExpanded = hasChildren && node.IsExpanded;
                 bool canToggle = hasChildren && !(wrap.DialogueNode is DialogueNodeRoot);
@@ -156,6 +182,8 @@ namespace DialogueEditor
                     isItalic = true;
                 }
 
+                Thickness rowMargin = GetRowMargin(node, wrap.IsDisplayRow);
+                Thickness rowPadding = GetRowPadding(node, wrap.IsDisplayRow);
                 rows.Add(new WpfDialogueTreeRow(
                     wrap.DialogueNode.ID,
                     text,
@@ -170,8 +198,18 @@ namespace DialogueEditor
                     isItalic ? FontStyles.Italic : FontStyles.Normal,
                     ConvertPointsToDip(rowFontSizePoints),
                     nodeFont.Name,
-                    GetRowMargin(node, wrap.IsDisplayRow),
-                    GetRowPadding(node, wrap.IsDisplayRow),
+                    typeTagText,
+                    typeTagBrush,
+                    accentBrush,
+                    branchBackgroundBrush,
+                    branchBorderBrush,
+                    branchBorderThickness,
+                    branchRailBrush1,
+                    branchRailBrush2,
+                    branchRailBrush3,
+                    branchRailBrush4,
+                    rowMargin,
+                    rowPadding,
                     textID,
                     textAttributes,
                     textActors,
@@ -182,7 +220,7 @@ namespace DialogueEditor
                     contentBrush));
 
                 if (!wrap.IsDisplayRow && (node.IsExpanded || wrap.DialogueNode is DialogueNodeRoot))
-                    BuildWpfTreeRows(rows, node.Nodes, selectedTreeNode);
+                    BuildWpfTreeRows(rows, node.Nodes, selectedTreeNode, null);
             }
         }
 
@@ -198,6 +236,174 @@ namespace DialogueEditor
             }
 
             return false;
+        }
+
+        private List<BranchRenderContext> ResolveBranchContexts(TreeNode node, NodeWrap wrap, List<BranchRenderContext> inheritedContexts)
+        {
+            List<BranchRenderContext> contexts = new List<BranchRenderContext>();
+            if (inheritedContexts != null && inheritedContexts.Count > 0)
+                contexts.AddRange(inheritedContexts);
+
+            TreeNode anchorNode = ResolveBranchAnchorNode(node, wrap);
+            if (anchorNode == null || !IsTreeNodeReply(anchorNode) || !IsTreeNodeChoice(anchorNode.Parent))
+                return contexts;
+
+            contexts.Add(new BranchRenderContext(GetReplyIndexInChoice(anchorNode)));
+            return contexts;
+        }
+
+        private TreeNode ResolveBranchAnchorNode(TreeNode node, NodeWrap wrap)
+        {
+            TreeNode realNode = GetRealTreeNode(node);
+            if (IsTreeNodeReply(realNode))
+                return realNode;
+
+            if (wrap != null && wrap.IsDisplayRow && wrap.OwnerTreeNode != null)
+            {
+                TreeNode ownerNode = GetRealTreeNode(wrap.OwnerTreeNode);
+                if (IsTreeNodeReply(ownerNode))
+                    return ownerNode;
+            }
+
+            return null;
+        }
+
+        private void ResolveBranchRailBrushes(
+            List<BranchRenderContext> branchContexts,
+            out SolidColorBrush branchRailBrush1,
+            out SolidColorBrush branchRailBrush2,
+            out SolidColorBrush branchRailBrush3,
+            out SolidColorBrush branchRailBrush4)
+        {
+            branchRailBrush1 = null;
+            branchRailBrush2 = null;
+            branchRailBrush3 = null;
+            branchRailBrush4 = null;
+
+            if (branchContexts == null || branchContexts.Count <= 0)
+                return;
+
+            const int maxRails = 4;
+            int startIndex = Math.Max(0, branchContexts.Count - maxRails);
+            int railIndex = 0;
+            for (int i = startIndex; i < branchContexts.Count; ++i)
+            {
+                BranchRenderContext context = branchContexts[i];
+                System.Drawing.Color branchColor = GetBranchContainerColor(context.ReplyIndex);
+                int alpha = Math.Min(128, 72 + (railIndex * 14));
+                SolidColorBrush railBrush = ConvertBrush(System.Drawing.Color.FromArgb(alpha, branchColor.R, branchColor.G, branchColor.B));
+                if (railIndex == 0)
+                    branchRailBrush1 = railBrush;
+                else if (railIndex == 1)
+                    branchRailBrush2 = railBrush;
+                else if (railIndex == 2)
+                    branchRailBrush3 = railBrush;
+                else if (railIndex == 3)
+                    branchRailBrush4 = railBrush;
+
+                ++railIndex;
+            }
+        }
+
+        private int GetReplyIndexInChoice(TreeNode replyNode)
+        {
+            if (!IsTreeNodeReply(replyNode) || !IsTreeNodeChoice(replyNode.Parent))
+                return 0;
+
+            int index = 0;
+            foreach (TreeNode sibling in replyNode.Parent.Nodes)
+            {
+                if (IsDisplayTreeNode(sibling) || !IsTreeNodeReply(sibling))
+                    continue;
+
+                if (sibling == replyNode)
+                    return index;
+
+                ++index;
+            }
+
+            return 0;
+        }
+
+        private System.Drawing.Color GetBranchContainerColor(int replyIndex)
+        {
+            return System.Drawing.Color.FromArgb(96, 128, 164);
+        }
+
+        private void ResolveRowTemplateStyle(TreeNode node, NodeWrap wrap, out string typeTagText, out SolidColorBrush typeTagBrush, out SolidColorBrush accentBrush)
+        {
+            bool showTypeTags = EditorCore.Settings != null && EditorCore.Settings.WpfTreeShowTypeTags;
+            typeTagText = string.Empty;
+            typeTagBrush = null;
+            accentBrush = null;
+
+            if (wrap == null || wrap.DialogueNode == null)
+            {
+                typeTagBrush = ConvertBrush(System.Drawing.Color.DimGray);
+                accentBrush = ConvertBrush(System.Drawing.Color.Transparent);
+                return;
+            }
+
+            System.Drawing.Color accentColor = System.Drawing.Color.DimGray;
+            System.Drawing.Color tagColor = System.Drawing.Color.DimGray;
+
+            if (wrap.IsDisplayRow)
+            {
+                if (wrap.DisplayRowKind == EDisplayRowKind.Context)
+                {
+                    typeTagText = showTypeTags ? "Context " : string.Empty;
+                    tagColor = System.Drawing.Color.SlateBlue;
+                }
+                else
+                {
+                    typeTagText = showTypeTags ? "Comment " : string.Empty;
+                    tagColor = System.Drawing.Color.Gray;
+                }
+            }
+            else if (wrap.DialogueNode is DialogueNodeRoot)
+            {
+                typeTagText = showTypeTags ? "Root " : string.Empty;
+                tagColor = System.Drawing.Color.DimGray;
+            }
+            else if (wrap.DialogueNode is DialogueNodeSentence)
+            {
+                typeTagText = showTypeTags ? "Say " : string.Empty;
+                tagColor = System.Drawing.Color.DimGray;
+            }
+            else if (wrap.DialogueNode is DialogueNodeChoice)
+            {
+                typeTagText = showTypeTags ? "Choice " : string.Empty;
+                tagColor = System.Drawing.Color.FromArgb(186, 82, 0);
+            }
+            else if (wrap.DialogueNode is DialogueNodeReply)
+            {
+                typeTagText = showTypeTags ? "Reply " : string.Empty;
+                tagColor = System.Drawing.Color.FromArgb(176, 0, 0);
+            }
+            else if (wrap.DialogueNode is DialogueNodeGoto)
+            {
+                typeTagText = showTypeTags ? "Goto " : string.Empty;
+                tagColor = System.Drawing.Color.DimGray;
+            }
+            else if (wrap.DialogueNode is DialogueNodeBranch)
+            {
+                typeTagText = showTypeTags ? "Branch " : string.Empty;
+                tagColor = System.Drawing.Color.FromArgb(186, 82, 0);
+            }
+            else if (wrap.DialogueNode is DialogueNodeReturn)
+            {
+                typeTagText = showTypeTags ? "Return " : string.Empty;
+                tagColor = System.Drawing.Color.FromArgb(186, 82, 0);
+            }
+            else if (wrap.DialogueNode is DialogueNodeComment)
+            {
+                typeTagText = showTypeTags ? "Comment " : string.Empty;
+                tagColor = System.Drawing.Color.Gray;
+            }
+
+            accentColor = System.Drawing.Color.Transparent;
+            typeTagBrush = ConvertBrush(tagColor);
+            accentBrush = ConvertBrush(accentColor);
         }
 
         private void OnWpfTreeNodeSelected(object sender, int selectedNodeID)

@@ -39,6 +39,7 @@ namespace DialogueEditor
         public bool UseWpfDialogueTree { get; set; }
         public double WpfTreeGapDefault { get; set; }
         public double WpfTreeGapSameSpeaker { get; set; }
+        public bool WpfTreeShowTypeTags { get; set; }
         public bool RefreshTreeViewOnEdit { get; set; }
         public Font DialogueTreeViewFont { get; set; }
         public int MaxUndoLevels { get; set; }
@@ -76,6 +77,7 @@ namespace DialogueEditor
             UseWpfDialogueTree = true;
             WpfTreeGapDefault = 2.0;
             WpfTreeGapSameSpeaker = 1.0;
+            WpfTreeShowTypeTags = false;
             RefreshTreeViewOnEdit = false;
             DialogueTreeViewFont = null;
             MaxUndoLevels = 50;

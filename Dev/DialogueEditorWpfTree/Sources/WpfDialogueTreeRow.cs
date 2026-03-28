@@ -20,6 +20,16 @@ namespace DialogueEditor.WpfTree
         public FontStyle RowFontStyle { get; private set; }
         public double RowFontSize { get; private set; }
         public string RowFontFamilyName { get; private set; }
+        public string TypeTagText { get; private set; }
+        public Brush TypeTagBrush { get; private set; }
+        public Brush AccentBrush { get; private set; }
+        public Brush BranchBackgroundBrush { get; private set; }
+        public Brush BranchBorderBrush { get; private set; }
+        public Thickness BranchBorderThickness { get; private set; }
+        public Brush BranchRailBrush1 { get; private set; }
+        public Brush BranchRailBrush2 { get; private set; }
+        public Brush BranchRailBrush3 { get; private set; }
+        public Brush BranchRailBrush4 { get; private set; }
         public Thickness RowMargin { get; private set; }
         public Thickness RowPadding { get; private set; }
         public string SegmentIDText { get; private set; }
@@ -63,6 +73,16 @@ namespace DialogueEditor.WpfTree
             FontStyle rowFontStyle,
             double rowFontSize,
             string rowFontFamilyName,
+            string typeTagText,
+            Brush typeTagBrush,
+            Brush accentBrush,
+            Brush branchBackgroundBrush,
+            Brush branchBorderBrush,
+            Thickness branchBorderThickness,
+            Brush branchRailBrush1,
+            Brush branchRailBrush2,
+            Brush branchRailBrush3,
+            Brush branchRailBrush4,
             Thickness rowMargin,
             Thickness rowPadding,
             string segmentIDText,
@@ -87,6 +107,16 @@ namespace DialogueEditor.WpfTree
             RowFontStyle = rowFontStyle;
             RowFontSize = rowFontSize;
             RowFontFamilyName = string.IsNullOrWhiteSpace(rowFontFamilyName) ? "Segoe UI" : rowFontFamilyName;
+            TypeTagText = typeTagText ?? string.Empty;
+            TypeTagBrush = typeTagBrush ?? Brushes.DimGray;
+            AccentBrush = accentBrush ?? Brushes.Transparent;
+            BranchBackgroundBrush = branchBackgroundBrush ?? Brushes.Transparent;
+            BranchBorderBrush = branchBorderBrush ?? Brushes.Transparent;
+            BranchBorderThickness = branchBorderThickness;
+            BranchRailBrush1 = branchRailBrush1 ?? Brushes.Transparent;
+            BranchRailBrush2 = branchRailBrush2 ?? Brushes.Transparent;
+            BranchRailBrush3 = branchRailBrush3 ?? Brushes.Transparent;
+            BranchRailBrush4 = branchRailBrush4 ?? Brushes.Transparent;
             RowMargin = rowMargin;
             RowPadding = rowPadding;
             SegmentIDText = segmentIDText ?? string.Empty;

@@ -120,20 +120,41 @@ namespace DialogueEditor.WpfTree
         {
             DataTemplate template = new DataTemplate(typeof(WpfDialogueTreeRow));
 
-            FrameworkElementFactory borderFactory = new FrameworkElementFactory(typeof(Border));
-            borderFactory.SetBinding(Border.MarginProperty, new Binding("RowMargin"));
-            borderFactory.SetBinding(Border.PaddingProperty, new Binding("RowPadding"));
-            borderFactory.SetBinding(Border.BackgroundProperty, new Binding("BackgroundBrush"));
+            FrameworkElementFactory branchContainerFactory = new FrameworkElementFactory(typeof(Border));
+            branchContainerFactory.SetBinding(Border.MarginProperty, new Binding("RowMargin"));
+            branchContainerFactory.SetBinding(Border.BackgroundProperty, new Binding("BranchBackgroundBrush"));
 
-            FrameworkElementFactory panelFactory = new FrameworkElementFactory(typeof(StackPanel));
-            panelFactory.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+            FrameworkElementFactory rowBorderFactory = new FrameworkElementFactory(typeof(Border));
+            rowBorderFactory.SetBinding(Border.PaddingProperty, new Binding("RowPadding"));
+            rowBorderFactory.SetBinding(Border.BackgroundProperty, new Binding("BackgroundBrush"));
+            branchContainerFactory.AppendChild(rowBorderFactory);
+
+            FrameworkElementFactory gridFactory = new FrameworkElementFactory(typeof(Grid));
+            rowBorderFactory.AppendChild(gridFactory);
+
+            FrameworkElementFactory columnIndent = new FrameworkElementFactory(typeof(ColumnDefinition));
+            columnIndent.SetValue(ColumnDefinition.WidthProperty, GridLength.Auto);
+            gridFactory.AppendChild(columnIndent);
+
+            FrameworkElementFactory columnExpander = new FrameworkElementFactory(typeof(ColumnDefinition));
+            columnExpander.SetValue(ColumnDefinition.WidthProperty, new GridLength(ExpanderHitWidth));
+            gridFactory.AppendChild(columnExpander);
+
+            FrameworkElementFactory columnMetadata = new FrameworkElementFactory(typeof(ColumnDefinition));
+            columnMetadata.SetValue(ColumnDefinition.WidthProperty, GridLength.Auto);
+            gridFactory.AppendChild(columnMetadata);
+
+            FrameworkElementFactory columnContent = new FrameworkElementFactory(typeof(ColumnDefinition));
+            columnContent.SetValue(ColumnDefinition.WidthProperty, new GridLength(1, GridUnitType.Star));
+            gridFactory.AppendChild(columnContent);
 
             FrameworkElementFactory indentFactory = new FrameworkElementFactory(typeof(Border));
             indentFactory.SetBinding(FrameworkElement.WidthProperty, new Binding("IndentWidth"));
-            panelFactory.AppendChild(indentFactory);
+            indentFactory.SetValue(Grid.ColumnProperty, 0);
+            gridFactory.AppendChild(indentFactory);
 
             FrameworkElementFactory expanderFactory = new FrameworkElementFactory(typeof(TextBlock));
-            expanderFactory.SetValue(FrameworkElement.WidthProperty, ExpanderHitWidth);
+            expanderFactory.SetValue(Grid.ColumnProperty, 1);
             expanderFactory.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
             expanderFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
             expanderFactory.SetBinding(TextBlock.TextProperty, new Binding("ExpanderGlyph"));
@@ -142,15 +163,28 @@ namespace DialogueEditor.WpfTree
             expanderFactory.SetBinding(TextBlock.FontStyleProperty, new Binding("RowFontStyle"));
             expanderFactory.SetBinding(TextBlock.FontSizeProperty, new Binding("RowFontSize"));
             expanderFactory.SetBinding(TextBlock.FontFamilyProperty, new Binding("RowFontFamilyName"));
-            panelFactory.AppendChild(expanderFactory);
+            gridFactory.AppendChild(expanderFactory);
 
-            panelFactory.AppendChild(CreateSegmentTextBlock("SegmentIDText", "SegmentIDBrush"));
-            panelFactory.AppendChild(CreateSegmentTextBlock("SegmentAttributesText", "SegmentAttributesBrush"));
-            panelFactory.AppendChild(CreateSegmentTextBlock("SegmentActorsText", "SegmentActorsBrush"));
-            panelFactory.AppendChild(CreateSegmentTextBlock("SegmentContentText", "SegmentContentBrush", true));
+            FrameworkElementFactory metadataPanelFactory = new FrameworkElementFactory(typeof(StackPanel));
+            metadataPanelFactory.SetValue(Grid.ColumnProperty, 2);
+            metadataPanelFactory.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+            metadataPanelFactory.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 0, 8, 0));
+            metadataPanelFactory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
 
-            borderFactory.AppendChild(panelFactory);
-            template.VisualTree = borderFactory;
+            FrameworkElementFactory typeTagFactory = CreateSegmentTextBlock("TypeTagText", "TypeTagBrush");
+            typeTagFactory.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 2, 0));
+            metadataPanelFactory.AppendChild(typeTagFactory);
+            metadataPanelFactory.AppendChild(CreateSegmentTextBlock("SegmentIDText", "SegmentIDBrush"));
+            metadataPanelFactory.AppendChild(CreateSegmentTextBlock("SegmentAttributesText", "SegmentAttributesBrush"));
+            metadataPanelFactory.AppendChild(CreateSegmentTextBlock("SegmentActorsText", "SegmentActorsBrush"));
+            gridFactory.AppendChild(metadataPanelFactory);
+
+            FrameworkElementFactory contentFactory = CreateSegmentTextBlock("SegmentContentText", "SegmentContentBrush", true);
+            contentFactory.SetValue(Grid.ColumnProperty, 3);
+            contentFactory.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            gridFactory.AppendChild(contentFactory);
+
+            template.VisualTree = branchContainerFactory;
 
             return template;
         }

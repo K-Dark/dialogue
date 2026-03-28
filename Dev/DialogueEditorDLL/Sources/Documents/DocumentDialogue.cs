@@ -77,6 +77,7 @@ namespace DialogueEditor
         private Label labelWpfGapDefault;
         private Label labelWpfGapSameSpeaker;
         private ToolTip toolTipWpfGap;
+        private CheckBox checkBoxWpfTypeTags;
 
         //--------------------------------------------------------------------------------------------------------------
         // Class Methods
@@ -1579,7 +1580,7 @@ namespace DialogueEditor
             if (!useWpfDialogueTree)
                 return;
 
-            const int widthOffset = 90;
+            const int widthOffset = 120;
             int baselineClientWidth = 775;
             if (ClientSize.Width < baselineClientWidth + widthOffset)
                 ClientSize = new Size(baselineClientWidth + widthOffset, ClientSize.Height);
@@ -1590,28 +1591,38 @@ namespace DialogueEditor
 
             labelWpfGapDefault = new Label();
             labelWpfGapDefault.AutoSize = true;
-            labelWpfGapDefault.Location = new Point(630, 10);
+            labelWpfGapDefault.Location = new Point(650, 10);
             labelWpfGapDefault.Name = "labelWpfGapDefault";
-            labelWpfGapDefault.Size = new Size(16, 13);
+            labelWpfGapDefault.Size = new Size(16, 11);
             labelWpfGapDefault.Text = "G";
             labelWpfGapDefault.TextAlign = ContentAlignment.MiddleRight;
 
             labelWpfGapSameSpeaker = new Label();
             labelWpfGapSameSpeaker.AutoSize = true;
-            labelWpfGapSameSpeaker.Location = new Point(630, 27);
+            labelWpfGapSameSpeaker.Location = new Point(650, 25);
             labelWpfGapSameSpeaker.Name = "labelWpfGapSameSpeaker";
-            labelWpfGapSameSpeaker.Size = new Size(14, 13);
+            labelWpfGapSameSpeaker.Size = new Size(16, 11);
             labelWpfGapSameSpeaker.Text = "S";
             labelWpfGapSameSpeaker.TextAlign = ContentAlignment.MiddleRight;
+
+            checkBoxWpfTypeTags = new CheckBox();
+            checkBoxWpfTypeTags.AutoSize = true;
+            checkBoxWpfTypeTags.Location = new Point(208, 23);
+            checkBoxWpfTypeTags.Name = "checkBoxWpfTypeTags";
+            checkBoxWpfTypeTags.Size = new Size(74, 17);
+            checkBoxWpfTypeTags.TabIndex = 28;
+            checkBoxWpfTypeTags.Text = "Type Tags";
+            checkBoxWpfTypeTags.UseVisualStyleBackColor = true;
+            checkBoxWpfTypeTags.CheckedChanged += new EventHandler(this.OnWpfTypeTagVisibilityChanged);
 
             numericWpfGapDefault = new NumericUpDown();
             numericWpfGapDefault.DecimalPlaces = 1;
             numericWpfGapDefault.Increment = 0.1M;
             numericWpfGapDefault.Minimum = 0.0M;
             numericWpfGapDefault.Maximum = 12.0M;
-            numericWpfGapDefault.Location = new Point(648, 7);
+            numericWpfGapDefault.Location = new Point(668, 8);
             numericWpfGapDefault.Name = "numericWpfGapDefault";
-            numericWpfGapDefault.Size = new Size(49, 20);
+            numericWpfGapDefault.Size = new Size(49, 16);
             numericWpfGapDefault.TabIndex = 26;
             numericWpfGapDefault.ValueChanged += new EventHandler(this.OnWpfGapSettingsChanged);
 
@@ -1620,9 +1631,9 @@ namespace DialogueEditor
             numericWpfGapSameSpeaker.Increment = 0.1M;
             numericWpfGapSameSpeaker.Minimum = 0.0M;
             numericWpfGapSameSpeaker.Maximum = 12.0M;
-            numericWpfGapSameSpeaker.Location = new Point(648, 24);
+            numericWpfGapSameSpeaker.Location = new Point(668, 23);
             numericWpfGapSameSpeaker.Name = "numericWpfGapSameSpeaker";
-            numericWpfGapSameSpeaker.Size = new Size(49, 20);
+            numericWpfGapSameSpeaker.Size = new Size(49, 16);
             numericWpfGapSameSpeaker.TabIndex = 27;
             numericWpfGapSameSpeaker.ValueChanged += new EventHandler(this.OnWpfGapSettingsChanged);
 
@@ -1631,12 +1642,15 @@ namespace DialogueEditor
             toolTipWpfGap.SetToolTip(numericWpfGapDefault, "WPF tree: regular line gap");
             toolTipWpfGap.SetToolTip(labelWpfGapSameSpeaker, "WPF tree: same speaker line gap");
             toolTipWpfGap.SetToolTip(numericWpfGapSameSpeaker, "WPF tree: same speaker line gap");
+            toolTipWpfGap.SetToolTip(checkBoxWpfTypeTags, "WPF tree: show row type labels");
 
+            Controls.Add(checkBoxWpfTypeTags);
             Controls.Add(labelWpfGapDefault);
             Controls.Add(labelWpfGapSameSpeaker);
             Controls.Add(numericWpfGapDefault);
             Controls.Add(numericWpfGapSameSpeaker);
 
+            checkBoxWpfTypeTags.BringToFront();
             labelWpfGapDefault.BringToFront();
             labelWpfGapSameSpeaker.BringToFront();
             numericWpfGapDefault.BringToFront();
@@ -1645,10 +1659,11 @@ namespace DialogueEditor
 
         private void ResyncWpfGapControls()
         {
-            if (numericWpfGapDefault == null || numericWpfGapSameSpeaker == null || labelWpfGapDefault == null || labelWpfGapSameSpeaker == null)
+            if (numericWpfGapDefault == null || numericWpfGapSameSpeaker == null || labelWpfGapDefault == null || labelWpfGapSameSpeaker == null || checkBoxWpfTypeTags == null)
                 return;
 
             bool enabled = useWpfDialogueTree;
+            checkBoxWpfTypeTags.Visible = enabled;
             labelWpfGapDefault.Visible = enabled;
             labelWpfGapSameSpeaker.Visible = enabled;
             numericWpfGapDefault.Visible = enabled;
@@ -1662,6 +1677,7 @@ namespace DialogueEditor
 
             numericWpfGapDefault.Value = (decimal)Math.Min(12.0, gapDefault);
             numericWpfGapSameSpeaker.Value = (decimal)Math.Min(12.0, gapSameSpeaker);
+            checkBoxWpfTypeTags.Checked = EditorCore.Settings.WpfTreeShowTypeTags;
         }
 
         private void OnWpfGapSettingsChanged(object sender, EventArgs e)
@@ -1671,6 +1687,15 @@ namespace DialogueEditor
 
             EditorCore.Settings.WpfTreeGapDefault = (double)numericWpfGapDefault.Value;
             EditorCore.Settings.WpfTreeGapSameSpeaker = (double)numericWpfGapSameSpeaker.Value;
+            RefreshWpfTreeHost();
+        }
+
+        private void OnWpfTypeTagVisibilityChanged(object sender, EventArgs e)
+        {
+            if (lockCheckDisplayEvents || !useWpfDialogueTree || EditorCore.Settings == null)
+                return;
+
+            EditorCore.Settings.WpfTreeShowTypeTags = checkBoxWpfTypeTags.Checked;
             RefreshWpfTreeHost();
         }
 
