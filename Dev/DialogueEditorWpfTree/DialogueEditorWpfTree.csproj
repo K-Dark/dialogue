@@ -40,6 +40,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Sources\WpfDialogueTreeDragDropEventArgs.cs" />
+    <Compile Include="Sources\WpfDialogueTreeMouseEventArgs.cs" />
     <Compile Include="Sources\WpfDialogueTreeRow.cs" />
     <Compile Include="Sources\WpfDialogueTreeView.cs" />
   </ItemGroup>

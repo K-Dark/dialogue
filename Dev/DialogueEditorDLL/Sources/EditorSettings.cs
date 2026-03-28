@@ -37,6 +37,8 @@ namespace DialogueEditor
         public bool UseActorColors { get; set; }
         public bool UseConstants { get; set; }
         public bool UseWpfDialogueTree { get; set; }
+        public double WpfTreeGapDefault { get; set; }
+        public double WpfTreeGapSameSpeaker { get; set; }
         public bool RefreshTreeViewOnEdit { get; set; }
         public Font DialogueTreeViewFont { get; set; }
         public int MaxUndoLevels { get; set; }
@@ -72,6 +74,8 @@ namespace DialogueEditor
             UseActorColors = false;
             UseConstants = false;
             UseWpfDialogueTree = true;
+            WpfTreeGapDefault = 2.0;
+            WpfTreeGapSameSpeaker = 1.0;
             RefreshTreeViewOnEdit = false;
             DialogueTreeViewFont = null;
             MaxUndoLevels = 50;

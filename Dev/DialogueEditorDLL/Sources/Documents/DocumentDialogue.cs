@@ -72,6 +72,11 @@ namespace DialogueEditor
         protected List<State> previousStates = new List<State>();
         protected int indexState = 0;
         protected int displayNodeKeyCounter = 0;
+        private NumericUpDown numericWpfGapDefault;
+        private NumericUpDown numericWpfGapSameSpeaker;
+        private Label labelWpfGapDefault;
+        private Label labelWpfGapSameSpeaker;
+        private ToolTip toolTipWpfGap;
 
         //--------------------------------------------------------------------------------------------------------------
         // Class Methods
@@ -87,6 +92,7 @@ namespace DialogueEditor
             Name = Dialogue.GetName();
             tree.ImageList = EditorCore.DefaultImageList;
             InitializeWpfTreeHost();
+            InitializeWpfGapControls();
 
             //Use this to have multiple colors on a single node.
             //If there are visual glitches, you can try commenting this block.
@@ -115,6 +121,7 @@ namespace DialogueEditor
             RefreshTitle();
 
             SaveState();
+            RefreshWpfTreeHost();
             DialogueChanged?.Invoke(this);
         }
 
@@ -1567,6 +1574,106 @@ namespace DialogueEditor
             tree.ItemHeight = Math.Max(16, lineHeight);
         }
 
+        private void InitializeWpfGapControls()
+        {
+            if (!useWpfDialogueTree)
+                return;
+
+            const int widthOffset = 90;
+            int baselineClientWidth = 775;
+            if (ClientSize.Width < baselineClientWidth + widthOffset)
+                ClientSize = new Size(baselineClientWidth + widthOffset, ClientSize.Height);
+
+            label2.Location = new Point(625 + widthOffset, 4);
+            comboBoxLanguages.Location = new Point(633 + widthOffset, 12);
+            comboBoxLanguages.Size = new Size(130, 21);
+
+            labelWpfGapDefault = new Label();
+            labelWpfGapDefault.AutoSize = true;
+            labelWpfGapDefault.Location = new Point(630, 10);
+            labelWpfGapDefault.Name = "labelWpfGapDefault";
+            labelWpfGapDefault.Size = new Size(16, 13);
+            labelWpfGapDefault.Text = "G";
+            labelWpfGapDefault.TextAlign = ContentAlignment.MiddleRight;
+
+            labelWpfGapSameSpeaker = new Label();
+            labelWpfGapSameSpeaker.AutoSize = true;
+            labelWpfGapSameSpeaker.Location = new Point(630, 27);
+            labelWpfGapSameSpeaker.Name = "labelWpfGapSameSpeaker";
+            labelWpfGapSameSpeaker.Size = new Size(14, 13);
+            labelWpfGapSameSpeaker.Text = "S";
+            labelWpfGapSameSpeaker.TextAlign = ContentAlignment.MiddleRight;
+
+            numericWpfGapDefault = new NumericUpDown();
+            numericWpfGapDefault.DecimalPlaces = 1;
+            numericWpfGapDefault.Increment = 0.1M;
+            numericWpfGapDefault.Minimum = 0.0M;
+            numericWpfGapDefault.Maximum = 12.0M;
+            numericWpfGapDefault.Location = new Point(648, 7);
+            numericWpfGapDefault.Name = "numericWpfGapDefault";
+            numericWpfGapDefault.Size = new Size(49, 20);
+            numericWpfGapDefault.TabIndex = 26;
+            numericWpfGapDefault.ValueChanged += new EventHandler(this.OnWpfGapSettingsChanged);
+
+            numericWpfGapSameSpeaker = new NumericUpDown();
+            numericWpfGapSameSpeaker.DecimalPlaces = 1;
+            numericWpfGapSameSpeaker.Increment = 0.1M;
+            numericWpfGapSameSpeaker.Minimum = 0.0M;
+            numericWpfGapSameSpeaker.Maximum = 12.0M;
+            numericWpfGapSameSpeaker.Location = new Point(648, 24);
+            numericWpfGapSameSpeaker.Name = "numericWpfGapSameSpeaker";
+            numericWpfGapSameSpeaker.Size = new Size(49, 20);
+            numericWpfGapSameSpeaker.TabIndex = 27;
+            numericWpfGapSameSpeaker.ValueChanged += new EventHandler(this.OnWpfGapSettingsChanged);
+
+            toolTipWpfGap = new ToolTip(components);
+            toolTipWpfGap.SetToolTip(labelWpfGapDefault, "WPF tree: regular line gap");
+            toolTipWpfGap.SetToolTip(numericWpfGapDefault, "WPF tree: regular line gap");
+            toolTipWpfGap.SetToolTip(labelWpfGapSameSpeaker, "WPF tree: same speaker line gap");
+            toolTipWpfGap.SetToolTip(numericWpfGapSameSpeaker, "WPF tree: same speaker line gap");
+
+            Controls.Add(labelWpfGapDefault);
+            Controls.Add(labelWpfGapSameSpeaker);
+            Controls.Add(numericWpfGapDefault);
+            Controls.Add(numericWpfGapSameSpeaker);
+
+            labelWpfGapDefault.BringToFront();
+            labelWpfGapSameSpeaker.BringToFront();
+            numericWpfGapDefault.BringToFront();
+            numericWpfGapSameSpeaker.BringToFront();
+        }
+
+        private void ResyncWpfGapControls()
+        {
+            if (numericWpfGapDefault == null || numericWpfGapSameSpeaker == null || labelWpfGapDefault == null || labelWpfGapSameSpeaker == null)
+                return;
+
+            bool enabled = useWpfDialogueTree;
+            labelWpfGapDefault.Visible = enabled;
+            labelWpfGapSameSpeaker.Visible = enabled;
+            numericWpfGapDefault.Visible = enabled;
+            numericWpfGapSameSpeaker.Visible = enabled;
+
+            if (EditorCore.Settings == null)
+                return;
+
+            double gapDefault = Math.Max(0.0, EditorCore.Settings.WpfTreeGapDefault);
+            double gapSameSpeaker = Math.Max(0.0, EditorCore.Settings.WpfTreeGapSameSpeaker);
+
+            numericWpfGapDefault.Value = (decimal)Math.Min(12.0, gapDefault);
+            numericWpfGapSameSpeaker.Value = (decimal)Math.Min(12.0, gapSameSpeaker);
+        }
+
+        private void OnWpfGapSettingsChanged(object sender, EventArgs e)
+        {
+            if (lockCheckDisplayEvents || !useWpfDialogueTree || EditorCore.Settings == null)
+                return;
+
+            EditorCore.Settings.WpfTreeGapDefault = (double)numericWpfGapDefault.Value;
+            EditorCore.Settings.WpfTreeGapSameSpeaker = (double)numericWpfGapSameSpeaker.Value;
+            RefreshWpfTreeHost();
+        }
+
         public void Highlight(TreeNode node)
         {
             Highlight(node, Color.DarkGray);
@@ -1833,6 +1940,7 @@ namespace DialogueEditor
             checkBoxDisplayComments.Checked = EditorCore.Settings.DisplayComments;
             checkBoxUseActorColors.Checked = EditorCore.Settings.UseActorColors;
             checkBoxUseConstants.Checked = EditorCore.Settings.UseConstants;
+            ResyncWpfGapControls();
 
             lockCheckDisplayEvents = false;
         }
@@ -1914,7 +2022,9 @@ namespace DialogueEditor
 
         public bool ProcessCmdKey_Impl(Keys keyData)
         {
-            if (tree.Focused && (keyData == (Keys.F2) || keyData == (Keys.Enter)))
+            bool treeFocused = IsDialogueTreeFocused();
+
+            if (treeFocused && (keyData == (Keys.F2) || keyData == (Keys.Enter)))
             {
                 // Move the focus from the document TreeView to the Properties.
                 if (tree.SelectedNode != null)
@@ -1932,20 +2042,20 @@ namespace DialogueEditor
                     }
                 }
             }
-            else if (!tree.Focused && keyData == (Keys.F2))
+            else if (!treeFocused && keyData == (Keys.F2))
             {
                 // Move the focus back from the Properties to the document TreeView.
-                tree.Focus();
+                FocusDialogueTreeControl();
                 return true;
             }
-            else if (!tree.Focused && (keyData == (Keys.Enter) || keyData == (Keys.Shift | Keys.Enter)))
+            else if (!treeFocused && (keyData == (Keys.Enter) || keyData == (Keys.Shift | Keys.Enter)))
             {
                 // Validate edited workstring, then move the focus back from the Properties to the document TreeView.
                 if (tree.SelectedNode != null && EditorCore.Properties != null && EditorCore.Properties.IsEditingWorkstring())
                 {
                     EditorCore.Properties.ValidateEditedWorkstring();
 
-                    tree.Focus();
+                    FocusDialogueTreeControl();
                     return true;
                 }
             }

@@ -20,6 +20,7 @@ namespace DialogueEditor.WpfTree
         public FontStyle RowFontStyle { get; private set; }
         public double RowFontSize { get; private set; }
         public string RowFontFamilyName { get; private set; }
+        public Thickness RowMargin { get; private set; }
         public Thickness RowPadding { get; private set; }
         public string SegmentIDText { get; private set; }
         public string SegmentAttributesText { get; private set; }
@@ -62,6 +63,7 @@ namespace DialogueEditor.WpfTree
             FontStyle rowFontStyle,
             double rowFontSize,
             string rowFontFamilyName,
+            Thickness rowMargin,
             Thickness rowPadding,
             string segmentIDText,
             string segmentAttributesText,
@@ -85,6 +87,7 @@ namespace DialogueEditor.WpfTree
             RowFontStyle = rowFontStyle;
             RowFontSize = rowFontSize;
             RowFontFamilyName = string.IsNullOrWhiteSpace(rowFontFamilyName) ? "Segoe UI" : rowFontFamilyName;
+            RowMargin = rowMargin;
             RowPadding = rowPadding;
             SegmentIDText = segmentIDText ?? string.Empty;
             SegmentAttributesText = segmentAttributesText ?? string.Empty;
