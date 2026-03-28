@@ -25,8 +25,10 @@ namespace DialogueEditor
         private DocumentProject documentProject = null;
         private List<DocumentDialogue> documentDialogues = new List<DocumentDialogue>();
         private List<DocumentDialogueGraph> documentDialogueGraphs = new List<DocumentDialogueGraph>();
+        private List<DocumentDialogueScript> documentDialogueScripts = new List<DocumentDialogueScript>();
         private Timer statusTimer;
         private ToolStripMenuItem menuItemOpenDialogueGraph = null;
+        private ToolStripMenuItem menuItemOpenDialogueScript = null;
 
         private string lastClosedDialogue = "";
 
@@ -166,12 +168,21 @@ namespace DialogueEditor
             menuItemOpenDialogueGraph.Text = "Open Dialogue Graph";
             menuItemOpenDialogueGraph.Click += new EventHandler(this.OnOpenDialogueGraph);
 
+            menuItemOpenDialogueScript = new ToolStripMenuItem();
+            menuItemOpenDialogueScript.Image = Properties.Resources.note;
+            menuItemOpenDialogueScript.Name = "menuItemOpenDialogueScript";
+            menuItemOpenDialogueScript.ShortcutKeys = (Keys.Control | Keys.Shift | Keys.M);
+            menuItemOpenDialogueScript.Size = new Size(230, 22);
+            menuItemOpenDialogueScript.Text = "Open Script";
+            menuItemOpenDialogueScript.Click += new EventHandler(this.OnOpenDialogueScript);
+
             int indexInsert = menuItemExport.DropDownItems.IndexOf(menuItemCheck);
             if (indexInsert < 0)
                 indexInsert = 0;
 
             menuItemExport.DropDownItems.Insert(indexInsert, menuItemOpenDialogueGraph);
-            menuItemExport.DropDownItems.Insert(indexInsert + 1, new ToolStripSeparator());
+            menuItemExport.DropDownItems.Insert(indexInsert + 1, menuItemOpenDialogueScript);
+            menuItemExport.DropDownItems.Insert(indexInsert + 2, new ToolStripSeparator());
         }
 
         //Obsolete, prefer the OutputLog (and the label is used to display memory)
@@ -353,6 +364,40 @@ namespace DialogueEditor
                 OpenDocumentDialogueGraph(dialogue);
         }
 
+        public void OpenDocumentDialogueScript(Dialogue dialogue)
+        {
+            if (dialogue == null)
+                return;
+
+            foreach (DocumentDialogueScript document in documentDialogueScripts)
+            {
+                if (document.Dialogue == dialogue)
+                {
+                    document.Activate();
+                    return;
+                }
+            }
+
+            var newDocument = new DocumentDialogueScript(dialogue);
+            newDocument.NodeSelected += OnScriptNodeSelected;
+            newDocument.FormClosed += OnDocumentDialogueScriptFormClosed;
+            newDocument.Show(dockPanel, DockState.Document);
+            documentDialogueScripts.Add(newDocument);
+
+            var documentDialogue = documentDialogues.FirstOrDefault(item => item.Dialogue == dialogue);
+            if (documentDialogue != null)
+            {
+                newDocument.SelectNode(documentDialogue.GetSelectedDialogueNode());
+            }
+        }
+
+        public void OpenDocumentDialogueScript(string name)
+        {
+            var dialogue = ResourcesHandler.GetDialogue(name);
+            if (dialogue != null)
+                OpenDocumentDialogueScript(dialogue);
+        }
+
         public bool IsDocumentFocused(Dialogue dialogue)
         {
             foreach (DocumentDialogue document in documentDialogues)
@@ -414,6 +459,17 @@ namespace DialogueEditor
             return false;
         }
 
+        public bool CloseDocumentDialogueScript(DocumentDialogueScript document)
+        {
+            if (document != null)
+            {
+                document.Close();
+                return true;
+            }
+
+            return false;
+        }
+
         public void OpenDocumentProject()
         {
             if (documentProject != null)
@@ -457,6 +513,11 @@ namespace DialogueEditor
             while (documentDialogueGraphs.Count > 0)
             {
                 CloseDocumentDialogueGraph(documentDialogueGraphs[0]);
+            }
+
+            while (documentDialogueScripts.Count > 0)
+            {
+                CloseDocumentDialogueScript(documentDialogueScripts[0]);
             }
 
             CloseDocumentProject(true);
@@ -557,6 +618,11 @@ namespace DialogueEditor
                 document.RefreshTitle();
             }
 
+            foreach (DocumentDialogueScript document in documentDialogueScripts)
+            {
+                document.RefreshTitle();
+            }
+
             if (documentProject != null)
                 documentProject.RefreshTitle();
         }
@@ -636,6 +702,17 @@ namespace DialogueEditor
             }
         }
 
+        private void OnDocumentDialogueScriptFormClosed(object sender, FormClosedEventArgs e)
+        {
+            var document = sender as DocumentDialogueScript;
+            if (document != null)
+            {
+                document.NodeSelected -= OnScriptNodeSelected;
+                document.FormClosed -= OnDocumentDialogueScriptFormClosed;
+                documentDialogueScripts.Remove(document);
+            }
+        }
+
         private void OnDialogueNodeSelected(DocumentDialogue document, DialogueNode node)
         {
             if (document == null || lockSelectionSync)
@@ -648,6 +725,11 @@ namespace DialogueEditor
                 {
                     graph.RefreshDocument();
                     graph.SelectNode(node);
+                }
+
+                foreach (var script in documentDialogueScripts.Where(item => item.Dialogue == document.Dialogue))
+                {
+                    script.SelectNode(node);
                 }
             }
             finally
@@ -666,6 +748,13 @@ namespace DialogueEditor
                 graph.RefreshDocument();
                 graph.SelectNode(document.GetSelectedDialogueNode());
                 graph.RefreshTitle();
+            }
+
+            foreach (var script in documentDialogueScripts.Where(item => item.Dialogue == document.Dialogue))
+            {
+                script.RefreshDocument();
+                script.SelectNode(document.GetSelectedDialogueNode());
+                script.RefreshTitle();
             }
         }
 
@@ -694,6 +783,49 @@ namespace DialogueEditor
                     {
                         dialogueDocument.SelectRootNode();
                     }
+                }
+
+                foreach (var script in documentDialogueScripts.Where(item => item.Dialogue == graphDocument.Dialogue))
+                {
+                    script.SelectNode(node);
+                }
+            }
+            finally
+            {
+                lockSelectionSync = false;
+            }
+        }
+
+        private void OnScriptNodeSelected(DocumentDialogueScript scriptDocument, DialogueNode node)
+        {
+            if (scriptDocument == null || lockSelectionSync)
+                return;
+
+            lockSelectionSync = true;
+            try
+            {
+                var dialogueDocument = documentDialogues.FirstOrDefault(item => item.Dialogue == scriptDocument.Dialogue);
+                if (dialogueDocument == null)
+                {
+                    OpenDocumentDialogue(scriptDocument.Dialogue, (node != null) ? node.ID : DialogueNode.ID_NULL);
+                    dialogueDocument = documentDialogues.FirstOrDefault(item => item.Dialogue == scriptDocument.Dialogue);
+                }
+
+                if (dialogueDocument != null)
+                {
+                    if (node != null)
+                    {
+                        dialogueDocument.SelectNode(node);
+                    }
+                    else
+                    {
+                        dialogueDocument.SelectRootNode();
+                    }
+                }
+
+                foreach (var graph in documentDialogueGraphs.Where(item => item.Dialogue == scriptDocument.Dialogue))
+                {
+                    graph.SelectNode(node);
                 }
             }
             finally
@@ -1027,23 +1159,25 @@ namespace DialogueEditor
 
         private void OnOpenDialogueGraph(object sender, EventArgs e)
         {
-            if (dockPanel.ActiveDocument is DocumentDialogue)
+            Dialogue activeDialogue;
+            DialogueNode selectedNode;
+            if (TryGetActiveDialogueContext(out activeDialogue, out selectedNode))
             {
-                var document = dockPanel.ActiveDocument as DocumentDialogue;
-                OpenDocumentDialogueGraph(document.Dialogue);
-
-                var graph = documentDialogueGraphs.FirstOrDefault(item => item.Dialogue == document.Dialogue);
-                graph?.SelectNode(document.GetSelectedDialogueNode());
+                OpenDocumentDialogueGraph(activeDialogue);
+                var graph = documentDialogueGraphs.FirstOrDefault(item => item.Dialogue == activeDialogue);
+                graph?.SelectNode(selectedNode);
             }
-            else
+        }
+
+        private void OnOpenDialogueScript(object sender, EventArgs e)
+        {
+            Dialogue activeDialogue;
+            DialogueNode selectedNode;
+            if (TryGetActiveDialogueContext(out activeDialogue, out selectedNode))
             {
-                var document = GetActiveDocument();
-                if (document != null)
-                {
-                    OpenDocumentDialogueGraph(document.Dialogue);
-                    var graph = documentDialogueGraphs.FirstOrDefault(item => item.Dialogue == document.Dialogue);
-                    graph?.SelectNode(document.GetSelectedDialogueNode());
-                }
+                OpenDocumentDialogueScript(activeDialogue);
+                var script = documentDialogueScripts.FirstOrDefault(item => item.Dialogue == activeDialogue);
+                script?.SelectNode(selectedNode);
             }
         }
 
@@ -1293,6 +1427,62 @@ namespace DialogueEditor
             }
 
             return null;
+        }
+
+        private bool TryGetActiveDialogueContext(out Dialogue dialogue, out DialogueNode selectedNode)
+        {
+            dialogue = null;
+            selectedNode = null;
+
+            if (dockPanel.ActiveDocument is DocumentDialogue)
+            {
+                DocumentDialogue dialogueDocument = dockPanel.ActiveDocument as DocumentDialogue;
+                dialogue = dialogueDocument.Dialogue;
+                selectedNode = dialogueDocument.GetSelectedDialogueNode();
+                return dialogue != null;
+            }
+
+            if (dockPanel.ActiveDocument is DocumentDialogueScript)
+            {
+                DocumentDialogueScript scriptDocument = dockPanel.ActiveDocument as DocumentDialogueScript;
+                dialogue = scriptDocument.Dialogue;
+                selectedNode = scriptDocument.GetSelectedDialogueNode();
+                return dialogue != null;
+            }
+
+            if (dockPanel.ActiveDocument is DocumentDialogueGraph)
+            {
+                DocumentDialogueGraph graphDocument = dockPanel.ActiveDocument as DocumentDialogueGraph;
+                dialogue = graphDocument.Dialogue;
+                if (dialogue == null)
+                    return false;
+
+                DocumentDialogue linkedDialogueDocument = null;
+                foreach (DocumentDialogue document in documentDialogues)
+                {
+                    if (document.Dialogue == dialogue)
+                    {
+                        linkedDialogueDocument = document;
+                        break;
+                    }
+                }
+                if (linkedDialogueDocument != null)
+                {
+                    selectedNode = linkedDialogueDocument.GetSelectedDialogueNode();
+                }
+
+                return true;
+            }
+
+            var fallbackDocument = GetActiveDocument();
+            if (fallbackDocument != null)
+            {
+                dialogue = fallbackDocument.Dialogue;
+                selectedNode = fallbackDocument.GetSelectedDialogueNode();
+                return dialogue != null;
+            }
+
+            return false;
         }
     }
 }

@@ -292,6 +292,9 @@
     <Compile Include="Sources\Documents\DocumentDialogueGraph.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Sources\Documents\DocumentDialogueScript.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Sources\Resources\TranslationTable.cs" />
     <Compile Include="Sources\Resources\VoiceActor.cs" />
     <Compile Include="Sources\Controls\TriStateTreeView.cs">
