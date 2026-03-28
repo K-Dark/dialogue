@@ -17,6 +17,7 @@ using WpfHorizontalAlignment = System.Windows.HorizontalAlignment;
 using WpfMouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
 using WpfOrientation = System.Windows.Controls.Orientation;
 using WpfRowDefinition = System.Windows.Controls.RowDefinition;
+using WpfRun = System.Windows.Documents.Run;
 using WpfScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility;
 using WpfScrollViewer = System.Windows.Controls.ScrollViewer;
 using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
@@ -39,6 +40,7 @@ namespace DialogueEditor
             public bool Bold;
             public bool Italic;
             public bool IsTitle;
+            public string BoldPrefixText;
             public string Text;
             public Color Color;
             public List<ScriptBlock> Children = new List<ScriptBlock>();
@@ -229,14 +231,32 @@ namespace DialogueEditor
                 row.CornerRadius = new System.Windows.CornerRadius(3);
 
                 WpfTextBlock text = new WpfTextBlock();
-                text.Text = block.Text ?? string.Empty;
                 text.TextWrapping = WpfTextWrapping.Wrap;
                 text.TextTrimming = WpfTextTrimming.None;
-                text.Foreground = ConvertBrush(block.Color);
+                WpfBrush foreground = ConvertBrush(block.Color);
+                text.Foreground = foreground;
                 text.FontFamily = new WpfFontFamily("Consolas");
-                text.FontWeight = block.Bold ? System.Windows.FontWeights.SemiBold : System.Windows.FontWeights.Normal;
                 text.FontStyle = block.Italic ? System.Windows.FontStyles.Italic : System.Windows.FontStyles.Normal;
                 text.FontSize = block.IsTitle ? 13.0 : 12.0;
+
+                if (!string.IsNullOrEmpty(block.BoldPrefixText))
+                {
+                    WpfRun prefixRun = new WpfRun(block.BoldPrefixText);
+                    prefixRun.FontWeight = System.Windows.FontWeights.SemiBold;
+                    prefixRun.Foreground = foreground;
+                    text.Inlines.Add(prefixRun);
+
+                    WpfRun bodyRun = new WpfRun(block.Text ?? string.Empty);
+                    bodyRun.FontWeight = block.Bold ? System.Windows.FontWeights.SemiBold : System.Windows.FontWeights.Normal;
+                    bodyRun.Foreground = foreground;
+                    text.Inlines.Add(bodyRun);
+                }
+                else
+                {
+                    text.Text = block.Text ?? string.Empty;
+                    text.FontWeight = block.Bold ? System.Windows.FontWeights.SemiBold : System.Windows.FontWeights.Normal;
+                }
+
                 row.Child = text;
 
                 if (block.NodeID != DialogueNode.ID_NULL)
@@ -522,9 +542,10 @@ namespace DialogueEditor
             string speaker = ResolveSpeakerName(sentence);
             string text = GetLocalizedSentenceText(sentence);
             bool showSpeaker = lastSpeaker == null || !string.Equals(lastSpeaker, speaker, StringComparison.Ordinal);
-            string prefix = showSpeaker ? (speaker + ": ") : string.Empty;
 
-            ScriptBlock line = CreateLineBlock(sentence.ID, prefix + ToInlineText(text), Color.Black, showSpeaker, false, false);
+            ScriptBlock line = CreateLineBlock(sentence.ID, ToInlineText(text), Color.Black, false, false, false);
+            if (showSpeaker)
+                line.BoldPrefixText = speaker + ": ";
 
             if (!string.IsNullOrWhiteSpace(sentence.Context))
             {

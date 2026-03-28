@@ -783,6 +783,9 @@ namespace DialogueEditor
                     {
                         dialogueDocument.SelectRootNode();
                     }
+
+                    // Ensure properties panel updates even if selection did not change.
+                    dialogueDocument.ResyncSelectedNode();
                 }
 
                 foreach (var script in documentDialogueScripts.Where(item => item.Dialogue == graphDocument.Dialogue))
@@ -821,6 +824,9 @@ namespace DialogueEditor
                     {
                         dialogueDocument.SelectRootNode();
                     }
+
+                    // Ensure properties panel updates even if selection did not change.
+                    dialogueDocument.ResyncSelectedNode();
                 }
 
                 foreach (var graph in documentDialogueGraphs.Where(item => item.Dialogue == scriptDocument.Dialogue))
